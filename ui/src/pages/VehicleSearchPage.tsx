@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 import type { Member, SearchResponse } from '../types';
 
 // Build the full URL for an upload path (e.g. /uploads/file.pdf)
@@ -15,6 +16,8 @@ const VehicleSearchPage: React.FC = () => {
     const [results, setResults] = useState<Member[] | null>(null);
     const [searched, setSearched] = useState(false);
     const navigate = useNavigate();
+    const { role, wing } = useAuth();
+    const isSuperAdmin = role === 'superadmin' || wing === 'ALL';
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -64,7 +67,9 @@ const VehicleSearchPage: React.FC = () => {
             <div className="page-header">
                 <h1 className="page-header__title">🔍 Vehicle Search</h1>
                 <p className="page-header__subtitle">
-                    Search members by bike or car registration number in your wing
+                    {isSuperAdmin
+                        ? 'Search members by bike or car registration number across all wings'
+                        : `Search members by bike or car registration number in Wing ${wing}`}
                 </p>
             </div>
 
@@ -299,7 +304,11 @@ const VehicleSearchPage: React.FC = () => {
                         <div className="empty-state">
                             <div className="empty-state__icon">🔍</div>
                             <h3 className="empty-state__title">No results found</h3>
-                            <p>No member found with this registration number in your wing</p>
+                            <p>
+                                {isSuperAdmin
+                                    ? 'No member found with this registration number across all wings'
+                                    : `No member found with this registration number in Wing ${wing}`}
+                            </p>
                         </div>
                     )}
                 </div>

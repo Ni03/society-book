@@ -181,7 +181,7 @@ const updateMember = async (req, res) => {
 // GET /api/admin/search?registrationNo=MH12AB1234
 const searchByRegistration = async (req, res) => {
     try {
-        const { wing } = req.admin;
+        const { wing, role } = req.admin;
         const { registrationNo } = req.query;
 
         if (!registrationNo) {
@@ -208,23 +208,35 @@ const searchByRegistration = async (req, res) => {
             });
         }
 
-        const members = await Member.find({
-            wing,
+        // Superadmin / ALL-wing admins search across every wing
+        const isSuperAdmin = role === 'superadmin' || wing === 'ALL';
+
+        const query = {
             $or: [
                 { 'vehicles.bikes.registrationNumbers': normalizedRegNo },
                 { 'vehicles.cars.registrationNumbers': normalizedRegNo },
             ],
-        });
+        };
+
+        // Regular chairmen are restricted to their own wing
+        if (!isSuperAdmin) {
+            query.wing = wing;
+        }
+
+        const members = await Member.find(query);
 
         if (members.length === 0) {
             return res.json({
                 success: false,
-                message: 'No member found with this registration number in your wing.',
+                message: isSuperAdmin
+                    ? 'No member found with this registration number across all wings.'
+                    : 'No member found with this registration number in your wing.',
             });
         }
 
         res.json({
             success: true,
+            allWings: isSuperAdmin,
             data: members,
         });
     } catch (error) {
@@ -298,8 +310,31 @@ const exportMembersExcel = async (req, res) => {
             filter.fullName = { $regex: search, $options: 'i' };
         }
 
-        const members = await Member.find(filter).sort({ createdAt: -1 });
+        // Fetch all members – we will sort in JS for floor grouping
+        const rawMembers = await Member.find(filter);
 
+        // ── Helpers ──────────────────────────────────────────────────
+        // Extract the leading numeric part of a flat number (e.g. "101A" → 101)
+        const parseFlat = (f) => parseInt((f || '').replace(/\D+/, '')) || 0;
+        // Floor = first digit(s) when flat numbers follow "floor×100 + unit" pattern
+        // e.g. 101–199 → floor 1, 201–299 → floor 2, 1001–1099 → floor 10
+        const getFloor = (f) => {
+            const n = parseFlat(f);
+            if (n <= 0) return 0;
+            // Works for both 3-digit (101 → 1) and 4-digit (1001 → 10) schemes
+            if (n >= 1000) return Math.floor(n / 100);
+            return Math.floor(n / 100);
+        };
+
+        // Sort: floor ascending, then flat number ascending (sequential within floor)
+        rawMembers.sort((a, b) => {
+            const fa = parseFlat(a.flatNo), fb = parseFlat(b.flatNo);
+            const floorA = getFloor(a.flatNo), floorB = getFloor(b.flatNo);
+            if (floorA !== floorB) return floorA - floorB;
+            return fa - fb;
+        });
+
+        // ── Workbook / Sheet setup ────────────────────────────────────
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'Society Book';
         workbook.created = new Date();
@@ -309,41 +344,93 @@ const exportMembersExcel = async (req, res) => {
             pageSetup: { fitToPage: true, fitToWidth: 1 },
         });
 
-        // Define columns
+        const COL_COUNT = 13;
+
         sheet.columns = [
-            { header: '#', key: 'no', width: 5 },
+            { header: '#', key: 'no', width: 6 },
+            { header: 'Floor Sr.', key: 'floorSeq', width: 8 },
             { header: 'Full Name', key: 'fullName', width: 28 },
             { header: 'Phone Number', key: 'phoneNumber', width: 16 },
             { header: 'Flat No', key: 'flatNo', width: 10 },
             { header: 'Wing', key: 'wing', width: 7 },
             { header: 'Type', key: 'type', width: 10 },
             { header: 'Bikes', key: 'bikes', width: 8 },
-            { header: 'Bike Reg. Numbers', key: 'bikeRegs', width: 30 },
+            { header: 'Bike Reg.', key: 'bikeRegs', width: 28 },
             { header: 'Cars', key: 'cars', width: 8 },
-            { header: 'Car Reg. Numbers', key: 'carRegs', width: 30 },
+            { header: 'Car Reg.', key: 'carRegs', width: 28 },
             { header: 'Attachment', key: 'attachment', width: 14 },
             { header: 'Agreement Expiry', key: 'expiry', width: 18 },
-            { header: 'Registered On', key: 'createdAt', width: 18 },
         ];
 
-        // Style header row
+        // ── Style the main header row ─────────────────────────────────
         const headerRow = sheet.getRow(1);
         headerRow.eachCell((cell) => {
-            cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FF1E3A5F' },
-            };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
             cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            cell.border = {
-                bottom: { style: 'thin', color: { argb: 'FF2563EB' } },
-            };
+            cell.border = { bottom: { style: 'thin', color: { argb: 'FF2563EB' } } };
         });
         headerRow.height = 28;
 
-        // Add data rows
-        members.forEach((m, idx) => {
+        // ── Helper: style a floor-banner row ─────────────────────────
+        const styleFloorBanner = (row, floorNo) => {
+            // Merge all columns to make a wide banner
+            sheet.mergeCells(row.number, 1, row.number, COL_COUNT);
+            const cell = row.getCell(1);
+            cell.value = `  🏢  Floor ${floorNo}`;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, italic: false };
+            cell.alignment = { vertical: 'middle', horizontal: 'left' };
+            cell.border = {
+                top: { style: 'medium', color: { argb: 'FF3B82F6' } },
+                bottom: { style: 'medium', color: { argb: 'FF3B82F6' } },
+            };
+            row.height = 22;
+        };
+
+        // ── Helper: style a data row ──────────────────────────────────
+        const styleDataRow = (row, member, globalIdx) => {
+            const bgColor = globalIdx % 2 === 0 ? 'FFFAFBFF' : 'FFF0F4FF';
+            row.eachCell({ includeEmpty: true }, (cell) => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+                cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: false };
+                cell.border = { bottom: { style: 'hair', color: { argb: 'FFD1D5DB' } } };
+            });
+
+            // Highlight Type cell
+            const typeCell = row.getCell('type');
+            typeCell.fill = {
+                type: 'pattern', pattern: 'solid',
+                fgColor: { argb: member.type === 'owner' ? 'FFD1FAE5' : 'FFDBEAFE' },
+            };
+            typeCell.font = {
+                bold: true,
+                color: { argb: member.type === 'owner' ? 'FF065F46' : 'FF1E3A8A' },
+            };
+
+            row.height = 20;
+        };
+
+        // ── Write rows with floor grouping ───────────────────────────
+        let currentFloor = null;
+        let globalIdx = 0;   // 0-based, for zebra striping
+        let floorSeq = 0;   // counter that resets each floor
+
+        rawMembers.forEach((m) => {
+            const memberFloor = getFloor(m.flatNo);
+
+            // Insert floor banner when the floor changes
+            if (memberFloor !== currentFloor) {
+                currentFloor = memberFloor;
+                floorSeq = 0;
+
+                const bannerRow = sheet.addRow({});
+                styleFloorBanner(bannerRow, memberFloor === 0 ? 'Ground' : memberFloor);
+            }
+
+            floorSeq++;
+            globalIdx++;
+
             const bikeRegs = m.vehicles.bikes.registrationNumbers.join(', ') || '—';
             const carRegs = m.vehicles.cars.registrationNumbers.join(', ') || '—';
             const hasAttachment = m.type === 'owner'
@@ -354,7 +441,8 @@ const exportMembersExcel = async (req, res) => {
                 : null;
 
             const row = sheet.addRow({
-                no: idx + 1,
+                no: globalIdx,
+                floorSeq: floorSeq,
                 fullName: m.fullName,
                 phoneNumber: m.phoneNumber,
                 flatNo: m.flatNo,
@@ -365,52 +453,23 @@ const exportMembersExcel = async (req, res) => {
                 cars: m.vehicles.cars.count,
                 carRegs,
                 attachment: hasAttachment,
-                expiry: expiry,
-                createdAt: new Date(m.createdAt),
+                expiry,
             });
 
-            // Format date cells
             row.getCell('expiry').numFmt = 'dd-mmm-yyyy';
-            row.getCell('createdAt').numFmt = 'dd-mmm-yyyy';
 
-            // Zebra striping
-            const bgColor = idx % 2 === 0 ? 'FFFAFBFF' : 'FFF0F4FF';
-            row.eachCell({ includeEmpty: true }, (cell) => {
-                cell.fill = {
-                    type: 'pattern',
-                    pattern: 'solid',
-                    fgColor: { argb: bgColor },
-                };
-                cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: false };
-                cell.border = {
-                    bottom: { style: 'hair', color: { argb: 'FFD1D5DB' } },
-                };
-            });
-
-            // Highlight type cell
-            const typeCell = row.getCell('type');
-            typeCell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: m.type === 'owner' ? 'FFD1FAE5' : 'FFDBEAFE' },
-            };
-            typeCell.font = {
-                bold: true,
-                color: { argb: m.type === 'owner' ? 'FF065F46' : 'FF1E3A8A' },
-            };
-
-            row.height = 20;
+            styleDataRow(row, m, globalIdx);
         });
 
-        // Auto-filter on header row
+        // ── Auto-filter on header ─────────────────────────────────────
         sheet.autoFilter = {
             from: { row: 1, column: 1 },
-            to: { row: 1, column: sheet.columns.length },
+            to: { row: 1, column: COL_COUNT },
         };
 
-        // Stream response
+        // ── Stream response ───────────────────────────────────────────
         const safeWing = wing.replace(/[^A-Za-z0-9]/g, '_');
-        const filename = `Wing_${safeWing}_Members_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        const filename = `Wing_${safeWing}_Members_FloorWise_${new Date().toISOString().slice(0, 10)}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
@@ -430,3 +489,4 @@ module.exports = {
     searchByRegistration,
     exportMembersExcel,
 };
+

@@ -26,6 +26,13 @@ const seedAdmins = async () => {
             role: 'chairman',
         }));
 
+        admins.push({
+            username: 'superadmin',
+            password: 'SuperAdmin@123',
+            wing: 'ALL',
+            role: 'superadmin',
+        });
+
         for (const adminData of admins) {
             const admin = new Admin(adminData);
             await admin.save();

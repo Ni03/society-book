@@ -96,7 +96,12 @@ const createMember = async (req, res) => {
 
         // Validate owner-specific fields
         if (type.toLowerCase() === 'owner') {
-            // index2 is optional, do nothing specific
+            if (!index2File) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Index 2 document is required for owners.',
+                });
+            }
         }
 
         // Validate tenant-specific fields

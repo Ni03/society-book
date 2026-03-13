@@ -4,6 +4,7 @@ import api from '../api/axios';
 interface AuthContextType {
     token: string | null;
     wing: string | null;
+    role: string | null;
     isAuthenticated: boolean;
     login: (username: string, password: string) => Promise<void>;
     logout: () => void;
@@ -26,6 +27,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
     const [wing, setWing] = useState<string | null>(localStorage.getItem('wing'));
+    const [role, setRole] = useState<string | null>(localStorage.getItem('role'));
 
     const isAuthenticated = !!token;
 
@@ -40,13 +42,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } else {
             localStorage.removeItem('wing');
         }
-    }, [token, wing]);
+        if (role) {
+            localStorage.setItem('role', role);
+        } else {
+            localStorage.removeItem('role');
+        }
+    }, [token, wing, role]);
 
     const login = async (username: string, password: string): Promise<void> => {
         const response = await api.post('/auth/login', { username, password });
         if (response.data.success) {
             setToken(response.data.token);
             setWing(response.data.wing);
+            setRole(response.data.role || 'chairman');
         } else {
             throw new Error(response.data.message || 'Login failed');
         }
@@ -55,13 +63,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const logout = () => {
         setToken(null);
         setWing(null);
+        setRole(null);
         localStorage.removeItem('token');
         localStorage.removeItem('wing');
+        localStorage.removeItem('role');
     };
 
     return (
-        <AuthContext.Provider value={{ token, wing, isAuthenticated, login, logout }}>
+        <AuthContext.Provider value={{ token, wing, role, isAuthenticated, login, logout }}>
             {children}
         </AuthContext.Provider>
     );
 };
+

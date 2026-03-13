@@ -91,7 +91,9 @@ const PublicFormPage: React.FC = () => {
         }
 
         if (typeLower === 'owner') {
-            // index2 is optional now
+            if (!formData.index2) {
+                newErrors.index2 = 'Index 2 document is required for owners';
+            }
         }
 
         if (typeLower === 'tenant') {
@@ -439,8 +441,8 @@ const PublicFormPage: React.FC = () => {
                             {/* Owner-specific: index2 */}
                             {typeLower === 'owner' && (
                                 <div className="form-group" style={{ marginTop: '1.25rem' }}>
-                                    <label className="form-label" htmlFor="index2">
-                                        Index 2 (Optional)
+                                    <label className="form-label form-label--required" htmlFor="index2">
+                                        Index 2
                                     </label>
                                     <input
                                         id="index2"

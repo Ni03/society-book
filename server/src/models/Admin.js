@@ -18,14 +18,13 @@ const adminSchema = new mongoose.Schema(
         wing: {
             type: String,
             required: [true, 'Wing is required'],
-            enum: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'],
-            unique: true,
+            enum: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'ALL'],
             uppercase: true,
         },
         role: {
             type: String,
             default: 'chairman',
-            enum: ['chairman'],
+            enum: ['chairman', 'superadmin'],
         },
     },
     {
