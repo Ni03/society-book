@@ -115,7 +115,7 @@ async function seedMembers() {
                 if (data.fullName && data.fullName.length > (existing.fullName || '').length) {
                     existing.fullName = data.fullName; changed = true;
                 }
-                if (validPhone(data.phoneNumber) && !validPhone(existing.phoneNumber)) {
+                if (validPhone(data.phoneNumber) && data.phoneNumber !== existing.phoneNumber) {
                     existing.phoneNumber = data.phoneNumber; changed = true;
                 }
                 if (!existing.flatNo && data.flatNo) {

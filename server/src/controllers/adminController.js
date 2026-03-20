@@ -7,10 +7,13 @@ const path = require('path');
 // GET /api/admin/members - Get all members of chairman's wing
 const getMembers = async (req, res) => {
     try {
-        const { wing } = req.admin;
+        const { wing, role } = req.admin;
         const { type, search } = req.query;
 
-        const filter = { wing };
+        const isSuperAdmin = role === 'superadmin' || wing === 'ALL';
+
+        const filter = {};
+        if (!isSuperAdmin) filter.wing = wing;
 
         // Optional type filter
         if (type && ['owner', 'tenant'].includes(type.toLowerCase())) {
@@ -22,10 +25,11 @@ const getMembers = async (req, res) => {
             filter.fullName = { $regex: search, $options: 'i' };
         }
 
-        const members = await Member.find(filter).sort({ createdAt: -1 });
+        const members = await Member.find(filter).sort({ wing: 1, flatNo: 1 });
 
         // Compute stats
-        const allMembers = await Member.find({ wing });
+        const statsFilter = isSuperAdmin ? {} : { wing };
+        const allMembers = await Member.find(statsFilter);
         const totalMembers = allMembers.length;
         const ownerCount = allMembers.filter((m) => m.type === 'owner').length;
         const tenantCount = allMembers.filter((m) => m.type === 'tenant').length;
@@ -51,8 +55,9 @@ const getMembers = async (req, res) => {
 // GET /api/admin/members/:id - Get specific member
 const getMemberById = async (req, res) => {
     try {
-        const { wing } = req.admin;
+        const { wing, role } = req.admin;
         const { id } = req.params;
+        const isSuperAdmin = role === 'superadmin' || wing === 'ALL';
 
         // Guard against non-ObjectId values (e.g. "export") reaching the DB
         if (!require('mongoose').isValidObjectId(id)) {
@@ -68,8 +73,8 @@ const getMemberById = async (req, res) => {
             });
         }
 
-        // Wing match check
-        if (member.wing !== wing) {
+        // Wing match check — superadmin can view any wing
+        if (!isSuperAdmin && member.wing !== wing) {
             return res.status(403).json({
                 success: false,
                 message: 'Access denied. You can only view members of your wing.',
@@ -92,8 +97,9 @@ const getMemberById = async (req, res) => {
 // PUT /api/admin/members/:id - Update member
 const updateMember = async (req, res) => {
     try {
-        const { wing } = req.admin;
+        const { wing, role } = req.admin;
         const { id } = req.params;
+        const isSuperAdmin = role === 'superadmin' || wing === 'ALL';
 
         const member = await Member.findById(id);
 
@@ -104,8 +110,8 @@ const updateMember = async (req, res) => {
             });
         }
 
-        // Wing match check
-        if (member.wing !== wing) {
+        // Wing match check — superadmin can update any wing
+        if (!isSuperAdmin && member.wing !== wing) {
             return res.status(403).json({
                 success: false,
                 message: 'Access denied. You can only update members of your wing.',
@@ -208,9 +214,7 @@ const searchByRegistration = async (req, res) => {
             });
         }
 
-        // Superadmin / ALL-wing admins search across every wing
-        const isSuperAdmin = role === 'superadmin' || wing === 'ALL';
-
+        // Vehicle search is open across all wings for every authenticated admin
         const query = {
             $or: [
                 { 'vehicles.bikes.registrationNumbers': normalizedRegNo },
@@ -218,25 +222,18 @@ const searchByRegistration = async (req, res) => {
             ],
         };
 
-        // Regular chairmen are restricted to their own wing
-        if (!isSuperAdmin) {
-            query.wing = wing;
-        }
-
         const members = await Member.find(query);
 
         if (members.length === 0) {
             return res.json({
                 success: false,
-                message: isSuperAdmin
-                    ? 'No member found with this registration number across all wings.'
-                    : 'No member found with this registration number in your wing.',
+                message: 'No member found with this registration number across all wings.',
             });
         }
 
         res.json({
             success: true,
-            allWings: isSuperAdmin,
+            allWings: true,
             data: members,
         });
     } catch (error) {
@@ -251,8 +248,9 @@ const searchByRegistration = async (req, res) => {
 // DELETE /api/admin/members/:id - Delete member
 const deleteMember = async (req, res) => {
     try {
-        const { wing } = req.admin;
+        const { wing, role } = req.admin;
         const { id } = req.params;
+        const isSuperAdmin = role === 'superadmin' || wing === 'ALL';
 
         if (!require('mongoose').isValidObjectId(id)) {
             return res.status(400).json({ success: false, message: 'Invalid member ID.' });
@@ -264,8 +262,8 @@ const deleteMember = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Member not found.' });
         }
 
-        // Wing ownership check
-        if (member.wing !== wing) {
+        // Wing ownership check — superadmin can delete any wing
+        if (!isSuperAdmin && member.wing !== wing) {
             return res.status(403).json({
                 success: false,
                 message: 'Access denied. You can only delete members of your wing.',
@@ -299,10 +297,13 @@ const deleteMember = async (req, res) => {
 // GET /api/admin/members/export - Export all wing members as .xlsx
 const exportMembersExcel = async (req, res) => {
     try {
-        const { wing } = req.admin;
+        const { wing, role } = req.admin;
         const { type, search } = req.query;
 
-        const filter = { wing };
+        const isSuperAdmin = role === 'superadmin' || wing === 'ALL';
+
+        const filter = {};
+        if (!isSuperAdmin) filter.wing = wing;
         if (type && ['owner', 'tenant'].includes(type.toLowerCase())) {
             filter.type = type.toLowerCase();
         }
@@ -339,10 +340,13 @@ const exportMembersExcel = async (req, res) => {
         workbook.creator = 'Society Book';
         workbook.created = new Date();
 
-        const sheet = workbook.addWorksheet(`Wing ${wing} Members`, {
-            views: [{ state: 'frozen', ySplit: 1 }],
-            pageSetup: { fitToPage: true, fitToWidth: 1 },
-        });
+        const sheet = workbook.addWorksheet(
+            isSuperAdmin ? 'All Wings Members' : `Wing ${wing} Members`,
+            {
+                views: [{ state: 'frozen', ySplit: 1 }],
+                pageSetup: { fitToPage: true, fitToWidth: 1 },
+            }
+        );
 
         const COL_COUNT = 14;
 
@@ -477,8 +481,8 @@ const exportMembersExcel = async (req, res) => {
         };
 
         // ── Stream response ───────────────────────────────────────────
-        const safeWing = wing.replace(/[^A-Za-z0-9]/g, '_');
-        const filename = `Wing_${safeWing}_Members_FloorWise_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        const exportLabel = isSuperAdmin ? 'AllWings' : `Wing_${wing.replace(/[^A-Za-z0-9]/g, '_')}`;
+        const filename = `${exportLabel}_Members_FloorWise_${new Date().toISOString().slice(0, 10)}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 

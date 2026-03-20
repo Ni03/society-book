@@ -67,9 +67,7 @@ const VehicleSearchPage: React.FC = () => {
             <div className="page-header">
                 <h1 className="page-header__title">🔍 Vehicle Search</h1>
                 <p className="page-header__subtitle">
-                    {isSuperAdmin
-                        ? 'Search members by bike or car registration number across all wings'
-                        : `Search members by bike or car registration number in Wing ${wing}`}
+                    Search members by bike or car registration number across all wings
                 </p>
             </div>
 
@@ -192,34 +190,51 @@ const VehicleSearchPage: React.FC = () => {
                                                 🚗 Cars ({member.vehicles.cars.count})
                                             </div>
                                             <div className="vehicle-tags" style={{ marginTop: '4px' }}>
-                                                {member.vehicles.cars.registrationNumbers.map(
-                                                    (reg) => (
+                                                {member.vehicles.cars.list.map((car) => {
+                                                    const isMatch =
+                                                        car.regNo ===
+                                                        registrationNo
+                                                            .trim()
+                                                            .toUpperCase()
+                                                            .replace(/\s+/g, '');
+                                                    return (
                                                         <span
-                                                            key={reg}
+                                                            key={car.regNo}
                                                             className="vehicle-tag vehicle-tag--car"
                                                             style={{
-                                                                fontWeight:
-                                                                    reg ===
-                                                                        registrationNo
-                                                                            .trim()
-                                                                            .toUpperCase()
-                                                                            .replace(/\s+/g, '')
-                                                                        ? 800
-                                                                        : 600,
-                                                                border:
-                                                                    reg ===
-                                                                        registrationNo
-                                                                            .trim()
-                                                                            .toUpperCase()
-                                                                            .replace(/\s+/g, '')
-                                                                        ? '2px solid #1e40af'
-                                                                        : 'none',
+                                                                fontWeight: isMatch ? 800 : 600,
+                                                                border: isMatch
+                                                                    ? '2px solid #1e40af'
+                                                                    : 'none',
                                                             }}
                                                         >
-                                                            🚗 {reg}
+                                                            🚗 {car.regNo}
+                                                            {car.fastTag && (
+                                                                <span
+                                                                    title="FASTag"
+                                                                    style={{
+                                                                        marginLeft: '4px',
+                                                                        fontSize: '0.75rem',
+                                                                        opacity: 0.85,
+                                                                    }}
+                                                                >
+                                                                    📡
+                                                                </span>
+                                                            )}
+                                                            {car.parkingSlot && (
+                                                                <span
+                                                                    style={{
+                                                                        marginLeft: '4px',
+                                                                        fontSize: '0.75rem',
+                                                                        opacity: 0.7,
+                                                                    }}
+                                                                >
+                                                                    🅿️ {car.parkingSlot}
+                                                                </span>
+                                                            )}
                                                         </span>
-                                                    )
-                                                )}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -290,13 +305,15 @@ const VehicleSearchPage: React.FC = () => {
                                 </div>
 
                                 <div style={{ marginTop: '1rem' }}>
-                                    <button
-                                        className="btn btn--secondary btn--sm"
-                                        onClick={() => navigate(`/admin/members/${member._id}/edit`)}
-                                        id={`edit-search-result-${member._id}`}
-                                    >
-                                        ✏️ Edit Member
-                                    </button>
+                                    {
+                                        wing === member.wing && (<button
+                                            className="btn btn--secondary btn--sm"
+                                            onClick={() => navigate(`/admin/members/${member._id}/edit`)}
+                                            id={`edit-search-result-${member._id}`}
+                                        >
+                                            ✏️ Edit Member
+                                        </button>)
+                                    }
                                 </div>
                             </div>
                         ))
@@ -305,9 +322,7 @@ const VehicleSearchPage: React.FC = () => {
                             <div className="empty-state__icon">🔍</div>
                             <h3 className="empty-state__title">No results found</h3>
                             <p>
-                                {isSuperAdmin
-                                    ? 'No member found with this registration number across all wings'
-                                    : `No member found with this registration number in Wing ${wing}`}
+                                No member found with this registration number across all wings
                             </p>
                         </div>
                     )}
