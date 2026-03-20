@@ -74,7 +74,7 @@ const createMember = async (req, res) => {
         if (vehicles) {
             if (vehicles.bikes) {
                 const bikeCount = vehicles.bikes.count || 0;
-                const bikeRegs = vehicles.bikes.registrationNumbers || [];
+                const bikeRegs  = vehicles.bikes.registrationNumbers || [];
                 if (bikeCount > 0 && bikeRegs.length !== bikeCount) {
                     return res.status(400).json({
                         success: false,
@@ -84,11 +84,11 @@ const createMember = async (req, res) => {
             }
             if (vehicles.cars) {
                 const carCount = vehicles.cars.count || 0;
-                const carRegs = vehicles.cars.registrationNumbers || [];
-                if (carCount > 0 && carRegs.length !== carCount) {
+                const carList  = vehicles.cars.list  || [];
+                if (carCount > 0 && carList.length !== carCount) {
                     return res.status(400).json({
                         success: false,
-                        message: `Expected ${carCount} car registration number(s), got ${carRegs.length}.`,
+                        message: `Expected ${carCount} car entry(ies), got ${carList.length}.`,
                     });
                 }
             }
@@ -134,7 +134,12 @@ const createMember = async (req, res) => {
                 },
                 cars: {
                     count: vehicles?.cars?.count || 0,
-                    registrationNumbers: vehicles?.cars?.registrationNumbers || [],
+                    // Each car entry: { regNo, fastTag, parkingSlot }
+                    list: (vehicles?.cars?.list || []).map(v => ({
+                        regNo:       v.regNo       || '',
+                        fastTag:     v.fastTag      ?? false,
+                        parkingSlot: v.parkingSlot  || '',
+                    })),
                 },
             },
         };

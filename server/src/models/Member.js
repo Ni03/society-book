@@ -1,5 +1,28 @@
 const mongoose = require('mongoose');
 
+// ── Car entry sub-schema (cars have fastTag + parkingSlot) ────────────────────
+const carEntrySchema = new mongoose.Schema(
+    {
+        regNo: {
+            type: String,
+            required: [true, 'Registration number is required'],
+            trim: true,
+        },
+        fastTag: {
+            type: Boolean,
+            default: false,
+        },
+        // Parking slot number — empty string means not yet assigned
+        parkingSlot: {
+            type: String,
+            default: '',
+            trim: true,
+        },
+    },
+    { _id: false }
+);
+
+// ── Main member schema ────────────────────────────────────────────────────────
 const memberSchema = new mongoose.Schema(
     {
         fullName: {
@@ -36,6 +59,7 @@ const memberSchema = new mongoose.Schema(
             lowercase: true,
         },
         vehicles: {
+            // Bikes: simple array of registration number strings
             bikes: {
                 count: {
                     type: Number,
@@ -48,6 +72,7 @@ const memberSchema = new mongoose.Schema(
                     default: [],
                 },
             },
+            // Cars: structured list with fastTag and parkingSlot per vehicle
             cars: {
                 count: {
                     type: Number,
@@ -55,8 +80,8 @@ const memberSchema = new mongoose.Schema(
                     min: [0, 'Car count cannot be negative'],
                     default: 0,
                 },
-                registrationNumbers: {
-                    type: [String],
+                list: {
+                    type: [carEntrySchema],
                     default: [],
                 },
             },
@@ -83,42 +108,48 @@ const memberSchema = new mongoose.Schema(
     }
 );
 
-// Pre-save middleware to normalize registration numbers
-memberSchema.pre('save', async function () {
-    if (this.vehicles.bikes.registrationNumbers) {
+// ── Helper ────────────────────────────────────────────────────────────────────
+const normalizeReg = (r) => (r || '').trim().toUpperCase().replace(/\s+/g, '');
+
+// ── Pre-save: normalise all reg numbers ───────────────────────────────────────
+memberSchema.pre('save', function () {
+    // Bikes — plain strings
+    if (this.vehicles?.bikes?.registrationNumbers) {
         this.vehicles.bikes.registrationNumbers =
-            this.vehicles.bikes.registrationNumbers.map((r) =>
-                r.trim().toUpperCase().replace(/\s+/g, '')
-            );
+            this.vehicles.bikes.registrationNumbers.map(normalizeReg);
+        this.vehicles.bikes.count = this.vehicles.bikes.registrationNumbers.length;
     }
-    if (this.vehicles.cars.registrationNumbers) {
-        this.vehicles.cars.registrationNumbers =
-            this.vehicles.cars.registrationNumbers.map((r) =>
-                r.trim().toUpperCase().replace(/\s+/g, '')
-            );
+    // Cars — objects
+    if (this.vehicles?.cars?.list) {
+        this.vehicles.cars.list = this.vehicles.cars.list.map((v) => ({
+            ...(v.toObject ? v.toObject() : v),
+            regNo: normalizeReg(v.regNo),
+        }));
+        this.vehicles.cars.count = this.vehicles.cars.list.length;
     }
 });
 
-// Pre-findOneAndUpdate middleware to normalize registration numbers
-memberSchema.pre('findOneAndUpdate', async function () {
+// ── Pre-findOneAndUpdate: normalise when vehicles are patched ──────────────────
+memberSchema.pre('findOneAndUpdate', function () {
     const update = this.getUpdate();
     if (update?.vehicles?.bikes?.registrationNumbers) {
         update.vehicles.bikes.registrationNumbers =
-            update.vehicles.bikes.registrationNumbers.map((r) =>
-                r.trim().toUpperCase().replace(/\s+/g, '')
-            );
+            update.vehicles.bikes.registrationNumbers.map(normalizeReg);
+        update.vehicles.bikes.count =
+            update.vehicles.bikes.registrationNumbers.length;
     }
-    if (update?.vehicles?.cars?.registrationNumbers) {
-        update.vehicles.cars.registrationNumbers =
-            update.vehicles.cars.registrationNumbers.map((r) =>
-                r.trim().toUpperCase().replace(/\s+/g, '')
-            );
+    if (update?.vehicles?.cars?.list) {
+        update.vehicles.cars.list = update.vehicles.cars.list.map((v) => ({
+            ...v,
+            regNo: normalizeReg(v.regNo),
+        }));
+        update.vehicles.cars.count = update.vehicles.cars.list.length;
     }
 });
 
-// Indexes for vehicle search optimization
+// ── Indexes ───────────────────────────────────────────────────────────────────
 memberSchema.index({ wing: 1, 'vehicles.bikes.registrationNumbers': 1 });
-memberSchema.index({ wing: 1, 'vehicles.cars.registrationNumbers': 1 });
+memberSchema.index({ wing: 1, 'vehicles.cars.list.regNo': 1 });
 memberSchema.index({ wing: 1, type: 1 });
 
 const Member = mongoose.model('Member', memberSchema);

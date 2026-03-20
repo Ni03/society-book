@@ -5,6 +5,12 @@ import api from '../api/axios';
 import { VALID_WINGS, VALID_TYPES } from '../types';
 import type { WingType, MemberType } from '../types';
 
+interface CarEntry {
+    regNo: string;
+    fastTag: boolean;
+    parkingSlot: string;
+}
+
 interface FormErrors {
     [key: string]: string;
 }
@@ -26,7 +32,7 @@ const PublicFormPage: React.FC = () => {
         bikeCount: 0,
         bikeRegistrations: [] as string[],
         carCount: 0,
-        carRegistrations: [] as string[],
+        carRegistrations: [] as CarEntry[],
         index2: null as File | null,
         agreement: null as File | null,
         lastDayOfAgreement: '',
@@ -84,7 +90,7 @@ const PublicFormPage: React.FC = () => {
 
         if (formData.carCount > 0) {
             for (let i = 0; i < formData.carCount; i++) {
-                if (!formData.carRegistrations[i]?.trim()) {
+                if (!formData.carRegistrations[i]?.regNo?.trim()) {
                     newErrors[`carReg${i}`] = `Car registration #${i + 1} is required`;
                 }
             }
@@ -123,7 +129,8 @@ const PublicFormPage: React.FC = () => {
     const handleCarCountChange = (count: number) => {
         const newCount = Math.max(0, count);
         const newRegs = [...formData.carRegistrations];
-        while (newRegs.length < newCount) newRegs.push('');
+        while (newRegs.length < newCount)
+            newRegs.push({ regNo: '', fastTag: false, parkingSlot: '' });
         setFormData({
             ...formData,
             carCount: newCount,
@@ -137,9 +144,10 @@ const PublicFormPage: React.FC = () => {
         setFormData({ ...formData, bikeRegistrations: newRegs });
     };
 
-    const handleCarRegChange = (index: number, value: string) => {
-        const newRegs = [...formData.carRegistrations];
-        newRegs[index] = value;
+    const handleCarFieldChange = (index: number, field: keyof CarEntry, value: string | boolean) => {
+        const newRegs = formData.carRegistrations.map((r, i) =>
+            i === index ? { ...r, [field]: value } : r
+        );
         setFormData({ ...formData, carRegistrations: newRegs });
     };
 
@@ -170,9 +178,11 @@ const PublicFormPage: React.FC = () => {
                 },
                 cars: {
                     count: formData.carCount,
-                    registrationNumbers: formData.carRegistrations.map((r) =>
-                        r.trim().toUpperCase()
-                    ),
+                    list: formData.carRegistrations.map((r) => ({
+                        regNo: r.regNo.trim().toUpperCase(),
+                        fastTag: r.fastTag,
+                        parkingSlot: r.parkingSlot.trim(),
+                    })),
                 },
             }));
 
@@ -415,24 +425,79 @@ const PublicFormPage: React.FC = () => {
                             {formData.carCount > 0 && (
                                 <div className="dynamic-fields">
                                     <div className="dynamic-fields__title">
-                                        🚗 Car Registration Numbers
+                                        🚗 Car Details
                                     </div>
                                     {Array.from({ length: formData.carCount }).map((_, i) => (
-                                        <div className="form-group" key={`car-${i}`}>
-                                            <label className="form-label form-label--required" htmlFor={`carReg${i}`}>
-                                                Car #{i + 1} Registration
-                                            </label>
-                                            <input
-                                                id={`carReg${i}`}
-                                                type="text"
-                                                className={`form-input ${errors[`carReg${i}`] ? 'form-input--error' : ''}`}
-                                                placeholder="e.g. MH14XY5678"
-                                                value={formData.carRegistrations[i] || ''}
-                                                onChange={(e) => handleCarRegChange(i, e.target.value)}
-                                            />
-                                            {errors[`carReg${i}`] && (
-                                                <div className="form-error">⚠ {errors[`carReg${i}`]}</div>
-                                            )}
+                                        <div
+                                            key={`car-${i}`}
+                                            style={{
+                                                border: '1px solid var(--border-color)',
+                                                borderRadius: 'var(--border-radius-md)',
+                                                padding: '1rem',
+                                                marginBottom: '0.75rem',
+                                                background: 'var(--gray-50)',
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                🚗 Car #{i + 1}
+                                            </div>
+
+                                            {/* Registration Number */}
+                                            <div className="form-group">
+                                                <label className="form-label form-label--required" htmlFor={`carReg${i}`}>
+                                                    Registration Number
+                                                </label>
+                                                <input
+                                                    id={`carReg${i}`}
+                                                    type="text"
+                                                    className={`form-input ${errors[`carReg${i}`] ? 'form-input--error' : ''}`}
+                                                    placeholder="e.g. MH14XY5678"
+                                                    value={formData.carRegistrations[i]?.regNo || ''}
+                                                    onChange={(e) => handleCarFieldChange(i, 'regNo', e.target.value)}
+                                                />
+                                                {errors[`carReg${i}`] && (
+                                                    <div className="form-error">⚠ {errors[`carReg${i}`]}</div>
+                                                )}
+                                            </div>
+
+                                            {/* Parking Slot */}
+                                            <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                                                <label className="form-label" htmlFor={`carParking${i}`}>
+                                                    🅿️ Parking Slot
+                                                </label>
+                                                <input
+                                                    id={`carParking${i}`}
+                                                    type="text"
+                                                    className="form-input"
+                                                    placeholder="e.g. B-12"
+                                                    value={formData.carRegistrations[i]?.parkingSlot || ''}
+                                                    onChange={(e) => handleCarFieldChange(i, 'parkingSlot', e.target.value)}
+                                                />
+                                            </div>
+
+                                            {/* FASTag */}
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.6rem',
+                                                    marginTop: '0.75rem',
+                                                }}
+                                            >
+                                                <input
+                                                    id={`carFasttag${i}`}
+                                                    type="checkbox"
+                                                    style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer' }}
+                                                    checked={formData.carRegistrations[i]?.fastTag || false}
+                                                    onChange={(e) => handleCarFieldChange(i, 'fastTag', e.target.checked)}
+                                                />
+                                                <label
+                                                    htmlFor={`carFasttag${i}`}
+                                                    style={{ cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}
+                                                >
+                                                    📡 FASTag Enabled
+                                                </label>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

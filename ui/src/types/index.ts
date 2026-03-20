@@ -1,3 +1,10 @@
+
+export interface carDetails {
+    regNo: string,
+    fastTag: boolean,
+    parkingSlot: string,
+}
+
 export interface MemberVehicles {
     bikes: {
         count: number;
@@ -5,7 +12,7 @@ export interface MemberVehicles {
     };
     cars: {
         count: number;
-        registrationNumbers: string[];
+        list: carDetails[];
     };
 }
 

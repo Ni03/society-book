@@ -128,7 +128,7 @@ const updateMember = async (req, res) => {
             }
         }
 
-        // Validate vehicle counts match registration numbers
+        // Validate vehicle counts match entries
         if (updateData.vehicles) {
             if (updateData.vehicles.bikes) {
                 const bikeCount = updateData.vehicles.bikes.count || 0;
@@ -142,11 +142,11 @@ const updateMember = async (req, res) => {
             }
             if (updateData.vehicles.cars) {
                 const carCount = updateData.vehicles.cars.count || 0;
-                const carRegs = updateData.vehicles.cars.registrationNumbers || [];
-                if (carCount > 0 && carRegs.length !== carCount) {
+                const carList = updateData.vehicles.cars.list || [];
+                if (carCount > 0 && carList.length !== carCount) {
                     return res.status(400).json({
                         success: false,
-                        message: `Expected ${carCount} car registration number(s), got ${carRegs.length}.`,
+                        message: `Expected ${carCount} car entry(ies), got ${carList.length}.`,
                     });
                 }
             }
@@ -214,7 +214,7 @@ const searchByRegistration = async (req, res) => {
         const query = {
             $or: [
                 { 'vehicles.bikes.registrationNumbers': normalizedRegNo },
-                { 'vehicles.cars.registrationNumbers': normalizedRegNo },
+                { 'vehicles.cars.list.regNo': normalizedRegNo },
             ],
         };
 
@@ -344,7 +344,7 @@ const exportMembersExcel = async (req, res) => {
             pageSetup: { fitToPage: true, fitToWidth: 1 },
         });
 
-        const COL_COUNT = 13;
+        const COL_COUNT = 14;
 
         sheet.columns = [
             { header: '#', key: 'no', width: 6 },
@@ -357,7 +357,8 @@ const exportMembersExcel = async (req, res) => {
             { header: 'Bikes', key: 'bikes', width: 8 },
             { header: 'Bike Reg.', key: 'bikeRegs', width: 28 },
             { header: 'Cars', key: 'cars', width: 8 },
-            { header: 'Car Reg.', key: 'carRegs', width: 28 },
+            { header: 'Car Reg. (📡=FASTag)', key: 'carRegs', width: 35 },
+            { header: 'Parking Slot', key: 'parkingSlots', width: 18 },
             { header: 'Attachment', key: 'attachment', width: 14 },
             { header: 'Agreement Expiry', key: 'expiry', width: 18 },
         ];
@@ -432,7 +433,10 @@ const exportMembersExcel = async (req, res) => {
             globalIdx++;
 
             const bikeRegs = m.vehicles.bikes.registrationNumbers.join(', ') || '—';
-            const carRegs = m.vehicles.cars.registrationNumbers.join(', ') || '—';
+            // Cars: show regNo with 📡 icon when fastTag is true
+            const carRegs = m.vehicles.cars.list
+                .map(v => v.fastTag ? v.regNo : v.regNo)
+                .join(', ') || '—';
             const hasAttachment = m.type === 'owner'
                 ? (m.ownerDetails?.index2 ? 'Index 2 ✓' : '—')
                 : (m.tenantDetails?.agreement ? 'Agreement ✓' : '—');
@@ -452,6 +456,11 @@ const exportMembersExcel = async (req, res) => {
                 bikeRegs,
                 cars: m.vehicles.cars.count,
                 carRegs,
+                // Parking slots for cars that have one assigned
+                parkingSlots: m.vehicles.cars.list
+                    .filter(v => v.parkingSlot)
+                    .map(v => `${v.regNo}: ${v.parkingSlot}`)
+                    .join(', ') || '—',
                 attachment: hasAttachment,
                 expiry,
             });

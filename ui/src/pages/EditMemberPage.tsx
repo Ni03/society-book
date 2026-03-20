@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
-import type { Member, MemberResponse } from '../types';
+import type { carDetails, Member, MemberResponse } from '../types';
 
 const EditMemberPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -17,7 +17,7 @@ const EditMemberPage: React.FC = () => {
     const [bikeCount, setBikeCount] = useState(0);
     const [bikeRegs, setBikeRegs] = useState<string[]>([]);
     const [carCount, setCarCount] = useState(0);
-    const [carRegs, setCarRegs] = useState<string[]>([]);
+    const [carRegs, setCarRegs] = useState<carDetails[]>([]);
     const [index2, setIndex2] = useState('');
     const [agreement, setAgreement] = useState('');
     const [lastDayOfAgreement, setLastDayOfAgreement] = useState('');
@@ -34,7 +34,7 @@ const EditMemberPage: React.FC = () => {
                     setBikeCount(m.vehicles.bikes.count);
                     setBikeRegs([...m.vehicles.bikes.registrationNumbers]);
                     setCarCount(m.vehicles.cars.count);
-                    setCarRegs([...m.vehicles.cars.registrationNumbers]);
+                    setCarRegs([...m.vehicles.cars.list]);
                     setIndex2(m.ownerDetails?.index2 || '');
                     setAgreement(m.tenantDetails?.agreement || '');
                     setLastDayOfAgreement(
@@ -66,7 +66,7 @@ const EditMemberPage: React.FC = () => {
     const handleCarCountChange = (count: number) => {
         const newCount = Math.max(0, count);
         const newRegs = [...carRegs];
-        while (newRegs.length < newCount) newRegs.push('');
+        while (newRegs.length < newCount) newRegs.push({ regNo: '', fastTag: false, parkingSlot: '' });
         setCarCount(newCount);
         setCarRegs(newRegs.slice(0, newCount));
     };
@@ -95,7 +95,7 @@ const EditMemberPage: React.FC = () => {
 
         if (carCount > 0) {
             for (let i = 0; i < carCount; i++) {
-                if (!carRegs[i]?.trim()) {
+                if (!carRegs[i]?.regNo.trim()) {
                     toast.error(`Car registration #${i + 1} is required`);
                     return;
                 }
@@ -117,9 +117,11 @@ const EditMemberPage: React.FC = () => {
                     },
                     cars: {
                         count: carCount,
-                        registrationNumbers: carRegs.map((r) =>
-                            r.trim().toUpperCase()
-                        ),
+                        list: carRegs.map((r) => ({
+                            regNo: r.regNo.trim().toUpperCase(),
+                            fastTag: r.fastTag,
+                            parkingSlot: r.parkingSlot.trim(),
+                        })),
                     },
                 },
             };
@@ -308,25 +310,91 @@ const EditMemberPage: React.FC = () => {
                         {carCount > 0 && (
                             <div className="dynamic-fields">
                                 <div className="dynamic-fields__title">
-                                    🚗 Car Registration Numbers
+                                    🚗 Car Details
                                 </div>
                                 {Array.from({ length: carCount }).map((_, i) => (
-                                    <div className="form-group" key={`car-${i}`}>
-                                        <label className="form-label form-label--required" htmlFor={`edit-carReg${i}`}>
-                                            Car #{i + 1}
-                                        </label>
-                                        <input
-                                            id={`edit-carReg${i}`}
-                                            type="text"
-                                            className="form-input"
-                                            placeholder="e.g. MH14XY5678"
-                                            value={carRegs[i] || ''}
-                                            onChange={(e) => {
-                                                const newRegs = [...carRegs];
-                                                newRegs[i] = e.target.value;
-                                                setCarRegs(newRegs);
+                                    <div
+                                        key={`car-${i}`}
+                                        style={{
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: 'var(--border-radius-md)',
+                                            padding: '1rem',
+                                            marginBottom: '0.75rem',
+                                            background: 'var(--gray-50)',
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>
+                                            🚗 Car #{i + 1}
+                                        </div>
+
+                                        {/* Registration Number */}
+                                        <div className="form-group">
+                                            <label className="form-label form-label--required" htmlFor={`edit-carReg${i}`}>
+                                                Registration Number
+                                            </label>
+                                            <input
+                                                id={`edit-carReg${i}`}
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="e.g. MH14XY5678"
+                                                value={carRegs[i]?.regNo || ''}
+                                                onChange={(e) => {
+                                                    const newRegs = carRegs.map((r, idx) =>
+                                                        idx === i ? { ...r, regNo: e.target.value } : r
+                                                    );
+                                                    setCarRegs(newRegs);
+                                                }}
+                                            />
+                                        </div>
+
+                                        {/* Parking Slot */}
+                                        <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                                            <label className="form-label" htmlFor={`edit-carParking${i}`}>
+                                                🅿️ Parking Slot
+                                            </label>
+                                            <input
+                                                id={`edit-carParking${i}`}
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="e.g. B-12"
+                                                value={carRegs[i]?.parkingSlot || ''}
+                                                onChange={(e) => {
+                                                    const newRegs = carRegs.map((r, idx) =>
+                                                        idx === i ? { ...r, parkingSlot: e.target.value } : r
+                                                    );
+                                                    setCarRegs(newRegs);
+                                                }}
+                                            />
+                                        </div>
+
+                                        {/* FASTag */}
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.6rem',
+                                                marginTop: '0.75rem',
                                             }}
-                                        />
+                                        >
+                                            <input
+                                                id={`edit-carFasttag${i}`}
+                                                type="checkbox"
+                                                style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer' }}
+                                                checked={carRegs[i]?.fastTag || false}
+                                                onChange={(e) => {
+                                                    const newRegs = carRegs.map((r, idx) =>
+                                                        idx === i ? { ...r, fastTag: e.target.checked } : r
+                                                    );
+                                                    setCarRegs(newRegs);
+                                                }}
+                                            />
+                                            <label
+                                                htmlFor={`edit-carFasttag${i}`}
+                                                style={{ cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}
+                                            >
+                                                📡 FASTag Enabled
+                                            </label>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

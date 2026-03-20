@@ -242,9 +242,9 @@ const MembersPage: React.FC = () => {
                                                         🏍️ {reg}
                                                     </span>
                                                 ))}
-                                                {member.vehicles.cars.registrationNumbers.map((reg) => (
-                                                    <span key={reg} className="vehicle-tag vehicle-tag--car">
-                                                        🚗 {reg}
+                                                {member.vehicles.cars.list.map((car) => (
+                                                    <span key={car.regNo} className="vehicle-tag vehicle-tag--car">
+                                                        🚗 {car.regNo}
                                                     </span>
                                                 ))}
                                                 {member.vehicles.bikes.count === 0 &&
