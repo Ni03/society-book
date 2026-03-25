@@ -3,12 +3,34 @@
 const webPush = require('web-push');
 const PushSubscription = require('../models/PushSubscription');
 
-// Configure web-push once (reads from .env at require-time)
-webPush.setVapidDetails(
-    process.env.VAPID_SUBJECT  || 'mailto:admin@societybook.local',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-);
+// ── Lazy VAPID initialisation ─────────────────────────────────────────────────
+// Called only when a push is about to be sent, not at module-load time.
+// This prevents server crashes when env vars aren't set yet (e.g. cold Render deploy).
+let _vapidReady = false;
+const initVapid = () => {
+    if (_vapidReady) return true;
+
+    const subject    = process.env.VAPID_SUBJECT;
+    const publicKey  = process.env.VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
+
+    if (!publicKey || !privateKey) {
+        console.error(
+            '[push] VAPID keys not found in environment. ' +
+            'Add VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT in the Render dashboard ' +
+            '(or your .env file locally).'
+        );
+        return false;
+    }
+
+    webPush.setVapidDetails(
+        subject || 'mailto:admin@societybook.local',
+        publicKey,
+        privateKey
+    );
+    _vapidReady = true;
+    return true;
+};
 
 // ── GET /api/push/vapid-public-key ────────────────────────────────────────────
 // Returns the VAPID public key so the browser can subscribe
@@ -67,6 +89,7 @@ const unsubscribe = async (req, res) => {
  * payload = { title, body, url, tag, requireInteraction }
  */
 const sendPushToWing = async (wing, payload) => {
+    if (!initVapid()) return;
     try {
         // Find subscriptions for the target wing AND superadmins (wing 'ALL')
         const subscriptions = await PushSubscription.find({
