@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import api from '../api/axios';
+import { subscribePush, unsubscribePush } from '../utils/pushNotifications';
 
 interface AuthContextType {
     token: string | null;
@@ -55,12 +56,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setToken(response.data.token);
             setWing(response.data.wing);
             setRole(response.data.role || 'chairman');
+            // Subscribe to push after token is stored (token is set synchronously above)
+            // Small timeout to allow axios interceptor to pick up the new token
+            setTimeout(() => subscribePush().catch(console.error), 300);
         } else {
             throw new Error(response.data.message || 'Login failed');
         }
     };
 
     const logout = () => {
+        unsubscribePush().catch(console.error);
         setToken(null);
         setWing(null);
         setRole(null);
