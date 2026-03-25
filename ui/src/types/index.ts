@@ -39,12 +39,36 @@ export interface Member {
     updatedAt: string;
 }
 
+export interface Visitor {
+    _id: string;
+    visitorName: string;
+    visitorPhone: string;
+    purpose: string;
+    wing: string;
+    flatNo: string;
+    vehicle: { regNo: string; type: '2W' | '4W' | 'none' };
+    status: 'pending' | 'approved' | 'rejected' | 'expired' | 'archived';
+    hasPhoto: boolean;
+    loggedByUsername: string;
+    rejectReason: string;
+    expiresAt: string;
+    entryTime: string;
+    actionedAt: string | null;
+    createdAt: string;
+}
+
 export interface MembersResponse {
     success: boolean;
     stats: {
         total: number;
         owners: number;
         tenants: number;
+        twoWheelers: number;
+        fourWheelers: number;
+        ownerTwoWheelers: number;
+        ownerFourWheelers: number;
+        tenantTwoWheelers: number;
+        tenantFourWheelers: number;
     };
     data: Member[];
 }
@@ -58,6 +82,7 @@ export interface MemberResponse {
 export interface SearchResponse {
     success: boolean;
     data?: Member[];
+    visitors?: Visitor[];
     message?: string;
 }
 

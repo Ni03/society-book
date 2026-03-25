@@ -1,4 +1,5 @@
 const Member = require('../models/Member');
+const Visitor = require('../models/Visitor');
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
@@ -31,8 +32,20 @@ const getMembers = async (req, res) => {
         const statsFilter = isSuperAdmin ? {} : { wing };
         const allMembers = await Member.find(statsFilter);
         const totalMembers = allMembers.length;
-        const ownerCount = allMembers.filter((m) => m.type === 'owner').length;
-        const tenantCount = allMembers.filter((m) => m.type === 'tenant').length;
+        const owners  = allMembers.filter((m) => m.type === 'owner');
+        const tenants = allMembers.filter((m) => m.type === 'tenant');
+        const ownerCount  = owners.length;
+        const tenantCount = tenants.length;
+
+        // Vehicle counts — total
+        const twoWheelerCount  = allMembers.reduce((sum, m) => sum + (m.vehicles?.bikes?.count || 0), 0);
+        const fourWheelerCount = allMembers.reduce((sum, m) => sum + (m.vehicles?.cars?.count  || 0), 0);
+
+        // Vehicle counts — by member type
+        const ownerTwoWheelers   = owners.reduce((sum, m)  => sum + (m.vehicles?.bikes?.count || 0), 0);
+        const ownerFourWheelers  = owners.reduce((sum, m)  => sum + (m.vehicles?.cars?.count  || 0), 0);
+        const tenantTwoWheelers  = tenants.reduce((sum, m) => sum + (m.vehicles?.bikes?.count || 0), 0);
+        const tenantFourWheelers = tenants.reduce((sum, m) => sum + (m.vehicles?.cars?.count  || 0), 0);
 
         res.json({
             success: true,
@@ -40,6 +53,12 @@ const getMembers = async (req, res) => {
                 total: totalMembers,
                 owners: ownerCount,
                 tenants: tenantCount,
+                twoWheelers: twoWheelerCount,
+                fourWheelers: fourWheelerCount,
+                ownerTwoWheelers,
+                ownerFourWheelers,
+                tenantTwoWheelers,
+                tenantFourWheelers,
             },
             data: members,
         });
@@ -187,7 +206,6 @@ const updateMember = async (req, res) => {
 // GET /api/admin/search?registrationNo=MH12AB1234
 const searchByRegistration = async (req, res) => {
     try {
-        const { wing, role } = req.admin;
         const { registrationNo } = req.query;
 
         if (!registrationNo) {
@@ -214,27 +232,34 @@ const searchByRegistration = async (req, res) => {
             });
         }
 
-        // Vehicle search is open across all wings for every authenticated admin
-        const query = {
+        // ── Search members (all wings) ────────────────────────────────────────
+        const memberQuery = {
             $or: [
                 { 'vehicles.bikes.registrationNumbers': normalizedRegNo },
                 { 'vehicles.cars.list.regNo': normalizedRegNo },
             ],
         };
+        const members = await Member.find(memberQuery);
 
-        const members = await Member.find(query);
+        // ── Search approved, non-expired visitors ─────────────────────────────
+        const visitors = await Visitor.find({
+            'vehicle.regNo': normalizedRegNo,
+            status: 'approved',
+            expiresAt: { $gt: new Date() },
+        }).select('-photo');   // don't return heavy base64
 
-        if (members.length === 0) {
+        if (members.length === 0 && visitors.length === 0) {
             return res.json({
                 success: false,
-                message: 'No member found with this registration number across all wings.',
+                message: 'No member or visitor found with this registration number.',
             });
         }
 
         res.json({
             success: true,
             allWings: true,
-            data: members,
+            data: members.map(m => ({ ...m.toObject(), _resultType: 'member' })),
+            visitors: visitors.map(v => ({ ...v.toObject(), _resultType: 'visitor' })),
         });
     } catch (error) {
         console.error('Search Error:', error);
@@ -479,6 +504,61 @@ const exportMembersExcel = async (req, res) => {
             from: { row: 1, column: 1 },
             to: { row: 1, column: COL_COUNT },
         };
+
+        // ── Totals row at bottom of Members sheet ─────────────────────
+        const totalBikes = rawMembers.reduce((s, m) => s + (m.vehicles?.bikes?.count || 0), 0);
+        const totalCars  = rawMembers.reduce((s, m) => s + (m.vehicles?.cars?.count  || 0), 0);
+        const totalOwners  = rawMembers.filter(m => m.type === 'owner').length;
+        const totalTenants = rawMembers.filter(m => m.type === 'tenant').length;
+
+        const totalsRow = sheet.addRow({});
+        sheet.mergeCells(totalsRow.number, 1, totalsRow.number, 7);
+        totalsRow.getCell(1).value = `📊  TOTALS — Members: ${rawMembers.length}  |  Owners: ${totalOwners}  |  Tenants: ${totalTenants}`;
+        totalsRow.getCell(8).value  = totalBikes;   // Bikes column
+        totalsRow.getCell(10).value = totalCars;    // Cars column
+        totalsRow.eachCell({ includeEmpty: true }, (cell) => {
+            cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+            cell.font   = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+            cell.alignment = { vertical: 'middle', horizontal: 'left' };
+            cell.border = { top: { style: 'medium', color: { argb: 'FF3B82F6' } } };
+        });
+        totalsRow.height = 24;
+
+        // ── Summary sheet ─────────────────────────────────────────────
+        const summarySheet = workbook.addWorksheet('Summary');
+        const summaryData = [
+            ['Metric', 'Count'],
+            ['Total Members', rawMembers.length],
+            ['Owners', totalOwners],
+            ['Tenants', totalTenants],
+            ['Two Wheelers (Bikes)', totalBikes],
+            ['Four Wheelers (Cars)', totalCars],
+            ['Total Vehicles', totalBikes + totalCars],
+        ];
+        summaryData.forEach((rowData, idx) => {
+            const sRow = summarySheet.addRow(rowData);
+            if (idx === 0) {
+                sRow.eachCell(cell => {
+                    cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+                    cell.font   = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                });
+                sRow.height = 26;
+            } else {
+                const bgColor = idx % 2 === 0 ? 'FFFAFBFF' : 'FFF0F4FF';
+                sRow.eachCell(cell => {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+                    cell.font = { size: 11 };
+                    cell.alignment = { vertical: 'middle', horizontal: idx === 0 ? 'center' : 'left' };
+                    cell.border = { bottom: { style: 'hair', color: { argb: 'FFD1D5DB' } } };
+                });
+                sRow.height = 20;
+            }
+        });
+        summarySheet.columns = [
+            { key: 'metric', width: 28 },
+            { key: 'count',  width: 14 },
+        ];
 
         // ── Stream response ───────────────────────────────────────────
         const exportLabel = isSuperAdmin ? 'AllWings' : `Wing_${wing.replace(/[^A-Za-z0-9]/g, '_')}`;
