@@ -107,6 +107,7 @@
 25. Manivannan - J-405 - 9762055830
     2W - MH14FP4660
     2W - MH14MR0557
+    4W - TN10CB3910 - Fastag - Parking
 
 26. Ajay Auti - J-407 - 8600535220
     2W - MH12LY4989
@@ -288,9 +289,9 @@
     4W - MH14KS4538 - Fastag - Parking
 
 68. Sidhant Tapkir - J-1108 - 9158232455
-    4W - MH14JT2306 - Fastag - Parking
+    4W - MH14JT2306 - Parking
 
-69. Shriram Akolkar - J-1201 - 9028453927
+69. Shriram Akolkar - J-1201 - 9028453927 - Tenant
     2W - MH14LE1467
 
 70. Parikshit Parashar - J-1202 - 8446206080
@@ -314,3 +315,24 @@
 75. Shubham Hegana - J-1208 - 9665993559 - Tenant
     4W - MH11CQ1038 - Fastag - Parking
     2W - MH09ES8311
+
+76. Vipul Bhonde - J-904 - 9916702211
+    4W - MH14 LJ 7105 - Fastag - Parking
+    2W - MH01 DQ 1292
+
+77. Ravindra Deshmukh - J-508 - 7057531193
+    4W - MH14HW8485 - Fastag - Parking
+    4W - MH14MD8485 - Fastag - Parking
+    2W - MH12PW2438
+
+78. Rajaram Saste - J-306 - 9850917211
+    4W - MH 14 FS 8964 - Fastag - Parking
+    2W - MH 14 CZ6685
+
+79. Pratibha Thorat - J-207 - 9423569618
+    2W - MH12KU9627
+    2W - MH14KM2588
+
+80. Mitesh Toshniwal - J-1205 - 9028010043
+    2W - MH14GZ5035
+    2W - MH19EN3882
