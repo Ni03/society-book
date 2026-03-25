@@ -10,6 +10,9 @@ import DashboardPage from './pages/DashboardPage';
 import MembersPage from './pages/MembersPage';
 import EditMemberPage from './pages/EditMemberPage';
 import VehicleSearchPage from './pages/VehicleSearchPage';
+import SecurityPage from './pages/SecurityPage';
+import VisitorNotificationsPage from './pages/VisitorNotificationsPage';
+import VisitorHistoryPage from './pages/VisitorHistoryPage';
 
 const App: React.FC = () => {
     return (
@@ -63,6 +66,11 @@ const App: React.FC = () => {
                         <Route path="members" element={<MembersPage />} />
                         <Route path="members/:id/edit" element={<EditMemberPage />} />
                         <Route path="search" element={<VehicleSearchPage />} />
+                        {/* Security Supervisor */}
+                        <Route path="security" element={<SecurityPage />} />
+                        {/* Visitor Management */}
+                        <Route path="visitors/notifications" element={<VisitorNotificationsPage />} />
+                        <Route path="visitors/history" element={<VisitorHistoryPage />} />
                     </Route>
 
                     {/* Default redirect */}

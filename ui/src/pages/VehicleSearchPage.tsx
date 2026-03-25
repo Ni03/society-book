@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import type { Member, SearchResponse } from '../types';
+import type { Member, Visitor, SearchResponse } from '../types';
 
 // Build the full URL for an upload path (e.g. /uploads/file.pdf)
 const SERVER_ORIGIN = 'http://localhost:5000';
@@ -14,6 +14,7 @@ const VehicleSearchPage: React.FC = () => {
     const [registrationNo, setRegistrationNo] = useState('');
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState<Member[] | null>(null);
+    const [visitorResults, setVisitorResults] = useState<Visitor[]>([]);
     const [searched, setSearched] = useState(false);
     const navigate = useNavigate();
     const { role, wing } = useAuth();
@@ -52,11 +53,13 @@ const VehicleSearchPage: React.FC = () => {
             } else {
                 setResults([]);
             }
+            setVisitorResults(response.data.visitors ?? []);
         } catch (error: any) {
             toast.error(
                 error.response?.data?.message || 'Search failed'
             );
             setResults([]);
+            setVisitorResults([]);
         } finally {
             setLoading(false);
         }
@@ -317,7 +320,7 @@ const VehicleSearchPage: React.FC = () => {
                                 </div>
                             </div>
                         ))
-                    ) : (
+                    ) : visitorResults.length > 0 ? null : (
                         <div className="empty-state">
                             <div className="empty-state__icon">🔍</div>
                             <h3 className="empty-state__title">No results found</h3>
@@ -325,6 +328,74 @@ const VehicleSearchPage: React.FC = () => {
                                 No member found with this registration number across all wings
                             </p>
                         </div>
+                    )}
+
+                    {/* ── Visitor results ──────────────────────────────────────── */}
+                    {visitorResults.length > 0 && (
+                        <>
+                            <div style={{ marginTop: (results && results.length > 0) ? '1.5rem' : 0 }}>
+                                <h3 style={{
+                                    fontSize: '0.9rem', fontWeight: 700, color: '#5eead4',
+                                    textTransform: 'uppercase', letterSpacing: '0.06em',
+                                    margin: '0 0 0.75rem',
+                                }}>
+                                    🚸 Approved Visitor Match
+                                </h3>
+                                {visitorResults.map(v => {
+                                    const expiry = new Date(v.expiresAt);
+                                    const diffMs = expiry.getTime() - Date.now();
+                                    const h = Math.floor(diffMs / 3_600_000);
+                                    const m = Math.floor((diffMs % 3_600_000) / 60_000);
+                                    const timeLeft = diffMs > 0
+                                        ? (h > 0 ? `${h}h ${m}m left` : `${m}m left`)
+                                        : 'Expired';
+
+                                    return (
+                                        <div key={v._id} style={{
+                                            background: 'rgba(20,184,166,0.08)',
+                                            border: '1px solid rgba(94,234,212,0.25)',
+                                            borderRadius: '14px', padding: '1.25rem',
+                                            marginBottom: '0.75rem',
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f1f5f9' }}>
+                                                        👤 {v.visitorName}
+                                                    </div>
+                                                    {v.visitorPhone && <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>📞 {v.visitorPhone}</div>}
+                                                    <div style={{ fontSize: '0.85rem', color: '#5eead4', marginTop: '4px' }}>
+                                                        🏢 Flat {v.wing}-{v.flatNo}
+                                                        {v.purpose && <> · {v.purpose}</>}
+                                                    </div>
+                                                </div>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <span style={{
+                                                        background: '#14b8a622', color: '#5eead4',
+                                                        border: '1px solid #5eead444', fontSize: '0.72rem',
+                                                        fontWeight: 700, padding: '3px 10px', borderRadius: '20px',
+                                                    }}>
+                                                        🚸 VISITOR – APPROVED
+                                                    </span>
+                                                    <div style={{
+                                                        fontSize: '0.75rem', marginTop: '4px',
+                                                        color: diffMs > 0 ? '#6ee7b7' : '#f87171',
+                                                    }}>
+                                                        ⏳ {timeLeft}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem', fontSize: '0.8rem', color: '#94a3b8' }}>
+                                                <span>🚗 {v.vehicle.regNo} ({v.vehicle.type})</span>
+                                                <span>·</span>
+                                                <span>Entry: {new Date(v.entryTime).toLocaleString()}</span>
+                                                <span>·</span>
+                                                <span>By: {v.loggedByUsername || 'Security'}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
                     )}
                 </div>
             )}

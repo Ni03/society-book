@@ -33,6 +33,14 @@ const seedAdmins = async () => {
             role: 'superadmin',
         });
 
+        // Default security supervisor account
+        admins.push({
+            username: 'security',
+            password: 'Security@123',
+            wing: 'ALL',
+            role: 'security',
+        });
+
         for (const adminData of admins) {
             const admin = new Admin(adminData);
             await admin.save();
