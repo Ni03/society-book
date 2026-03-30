@@ -1,11 +1,12 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
 import PublicFormPage from './pages/PublicFormPage';
 import LoginPage from './pages/LoginPage';
+import MemberLoginPage from './pages/MemberLoginPage';
 import DashboardPage from './pages/DashboardPage';
 import MembersPage from './pages/MembersPage';
 import EditMemberPage from './pages/EditMemberPage';
@@ -13,6 +14,16 @@ import VehicleSearchPage from './pages/VehicleSearchPage';
 import SecurityPage from './pages/SecurityPage';
 import VisitorNotificationsPage from './pages/VisitorNotificationsPage';
 import VisitorHistoryPage from './pages/VisitorHistoryPage';
+import MemberProfilePage from './pages/MemberProfilePage';
+
+/** Smart root redirect based on role */
+const RootRedirect: React.FC = () => {
+    const { isAuthenticated, isMember } = useAuth();
+    if (isAuthenticated) {
+        return <Navigate to={isMember ? '/member/profile' : '/admin/dashboard'} replace />;
+    }
+    return <Navigate to="/login" replace />;
+};
 
 const App: React.FC = () => {
     return (
@@ -30,51 +41,52 @@ const App: React.FC = () => {
                             fontSize: '0.9rem',
                             fontFamily: "'Inter', sans-serif",
                         },
-                        success: {
-                            iconTheme: {
-                                primary: '#10b981',
-                                secondary: '#fff',
-                            },
-                        },
-                        error: {
-                            iconTheme: {
-                                primary: '#f43f5e',
-                                secondary: '#fff',
-                            },
-                        },
+                        success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+                        error:   { iconTheme: { primary: '#f43f5e', secondary: '#fff' } },
                     }}
                 />
 
                 <Routes>
-                    {/* Public Routes */}
+                    {/* ── Public form (member self-registration) ── */}
                     <Route path="/public/:wing/:type" element={<PublicFormPage />} />
 
-                    {/* Auth Routes */}
-                    <Route path="/login" element={<LoginPage />} />
+                    {/* ── Auth Routes ─────────────────────────── */}
+                    {/* Admin / Chairman / Security login */}
+                    <Route path="/login"        element={<LoginPage />} />
+                    {/* Resident / Member login */}
+                    <Route path="/member-login" element={<MemberLoginPage />} />
 
-                    {/* Protected Admin Routes */}
+                    {/* ── Member Portal ────────────────────────── */}
+                    <Route
+                        path="/member/profile"
+                        element={
+                            <ProtectedRoute requiredRole="member">
+                                <MemberProfilePage />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* ── Protected Admin Routes ───────────────── */}
                     <Route
                         path="/admin"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute requiredRole="admin">
                                 <AdminLayout />
                             </ProtectedRoute>
                         }
                     >
                         <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                        <Route path="dashboard" element={<DashboardPage />} />
-                        <Route path="members" element={<MembersPage />} />
-                        <Route path="members/:id/edit" element={<EditMemberPage />} />
-                        <Route path="search" element={<VehicleSearchPage />} />
-                        {/* Security Supervisor */}
-                        <Route path="security" element={<SecurityPage />} />
-                        {/* Visitor Management */}
+                        <Route path="dashboard"              element={<DashboardPage />} />
+                        <Route path="members"                element={<MembersPage />} />
+                        <Route path="members/:id/edit"       element={<EditMemberPage />} />
+                        <Route path="search"                 element={<VehicleSearchPage />} />
+                        <Route path="security"               element={<SecurityPage />} />
                         <Route path="visitors/notifications" element={<VisitorNotificationsPage />} />
-                        <Route path="visitors/history" element={<VisitorHistoryPage />} />
+                        <Route path="visitors/history"       element={<VisitorHistoryPage />} />
                     </Route>
 
-                    {/* Default redirect */}
-                    <Route path="/" element={<Navigate to="/login" replace />} />
+                    {/* ── Fallback ──────────────────────────────── */}
+                    <Route path="/" element={<RootRedirect />} />
                     <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
             </BrowserRouter>

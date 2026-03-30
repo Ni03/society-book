@@ -26,7 +26,11 @@ api.interceptors.response.use(
         if (error.response?.status === 401) {
             localStorage.removeItem('token');
             localStorage.removeItem('wing');
-            if (window.location.pathname.startsWith('/admin') || window.location.pathname === '/login') {
+            localStorage.removeItem('role');
+            localStorage.removeItem('memberId');
+            localStorage.removeItem('fullName');
+            const path = window.location.pathname;
+            if (path.startsWith('/admin') || path.startsWith('/member') || path === '/login') {
                 window.location.href = '/login';
             }
         }
