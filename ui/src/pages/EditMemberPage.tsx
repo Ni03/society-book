@@ -2,170 +2,104 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
-import type { carDetails, Member, MemberResponse } from '../types';
+import type { Member, MemberResponse } from '../types';
+import {
+    MemberForm,
+    LoadingScreen,
+    EmptyState,
+} from '../components/member';
+import type { MemberFormData, MemberFormInitialValues } from '../components/member';
 
 const EditMemberPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+
     const [member, setMember] = useState<Member | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [initialValues, setInitialValues] = useState<MemberFormInitialValues>({});
 
-    // Editable fields
-    const [phoneNumber, setPhoneNumber] = useState('');
-    const [flatNo, setFlatNo] = useState('');
-    const [bikeCount, setBikeCount] = useState(0);
-    const [bikeRegs, setBikeRegs] = useState<string[]>([]);
-    const [carCount, setCarCount] = useState(0);
-    const [carRegs, setCarRegs] = useState<carDetails[]>([]);
-    const [index2, setIndex2] = useState('');
-    const [agreement, setAgreement] = useState('');
-    const [lastDayOfAgreement, setLastDayOfAgreement] = useState('');
-
+    // ── Fetch member ──────────────────────────────────────────────────────────
     useEffect(() => {
-        const fetchMember = async () => {
+        const fetch = async () => {
             try {
-                const response = await api.get<MemberResponse>(`/admin/members/${id}`);
-                if (response.data.success) {
-                    const m = response.data.data;
+                const res = await api.get<MemberResponse>(`/admin/members/${id}`);
+                if (res.data.success) {
+                    const m = res.data.data;
                     setMember(m);
-                    setPhoneNumber(m.phoneNumber);
-                    setFlatNo(m.flatNo || '');
-                    setBikeCount(m.vehicles.bikes.count);
-                    setBikeRegs([...m.vehicles.bikes.registrationNumbers]);
-                    setCarCount(m.vehicles.cars.count);
-                    setCarRegs([...m.vehicles.cars.list]);
-                    setIndex2(m.ownerDetails?.index2 || '');
-                    setAgreement(m.tenantDetails?.agreement || '');
-                    setLastDayOfAgreement(
-                        m.tenantDetails?.lastDayOfAgreement
-                            ? new Date(m.tenantDetails.lastDayOfAgreement)
-                                .toISOString()
-                                .split('T')[0]
-                            : ''
-                    );
+                    setInitialValues({
+                        fullName:    m.fullName,
+                        phoneNumber: m.phoneNumber,
+                        flatNo:      m.flatNo || '',
+                        vehicles: {
+                            bikes: { ...m.vehicles.bikes, registrationNumbers: [...m.vehicles.bikes.registrationNumbers] },
+                            cars:  { ...m.vehicles.cars,  list: [...m.vehicles.cars.list] },
+                        },
+                        lastDayOfAgreement:
+                            m.tenantDetails?.lastDayOfAgreement
+                                ? new Date(m.tenantDetails.lastDayOfAgreement).toISOString().split('T')[0]
+                                : '',
+                        currentFileUrl:
+                            m.type === 'owner'
+                                ? m.ownerDetails?.index2
+                                : m.tenantDetails?.agreement,
+                    });
                 }
-            } catch (error: any) {
-                toast.error(error.response?.data?.message || 'Failed to load member');
+            } catch (err: any) {
+                toast.error(err.response?.data?.message || 'Failed to load member');
                 navigate('/admin/members');
             } finally {
                 setLoading(false);
             }
         };
-        fetchMember();
+        fetch();
     }, [id]);
 
-    const handleBikeCountChange = (count: number) => {
-        const newCount = Math.max(0, count);
-        const newRegs = [...bikeRegs];
-        while (newRegs.length < newCount) newRegs.push('');
-        setBikeCount(newCount);
-        setBikeRegs(newRegs.slice(0, newCount));
-    };
-
-    const handleCarCountChange = (count: number) => {
-        const newCount = Math.max(0, count);
-        const newRegs = [...carRegs];
-        while (newRegs.length < newCount) newRegs.push({ regNo: '', fastTag: false, parkingSlot: '' });
-        setCarCount(newCount);
-        setCarRegs(newRegs.slice(0, newCount));
-    };
-
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!phoneNumber || !/^\d{10}$/.test(phoneNumber)) {
-            toast.error('Phone number must be exactly 10 digits');
-            return;
-        }
-
-        if (!flatNo || flatNo.trim().length === 0) {
-            toast.error('Flat number is required');
-            return;
-        }
-
-        if (bikeCount > 0) {
-            for (let i = 0; i < bikeCount; i++) {
-                if (!bikeRegs[i]?.trim()) {
-                    toast.error(`Bike registration #${i + 1} is required`);
-                    return;
-                }
-            }
-        }
-
-        if (carCount > 0) {
-            for (let i = 0; i < carCount; i++) {
-                if (!carRegs[i]?.regNo.trim()) {
-                    toast.error(`Car registration #${i + 1} is required`);
-                    return;
-                }
-            }
-        }
-
+    // ── Submit — parent handles the API call ──────────────────────────────────
+    const handleSubmit = async (data: MemberFormData) => {
         setSaving(true);
-
         try {
             const payload: Record<string, unknown> = {
-                phoneNumber,
-                flatNo: flatNo.trim(),
+                phoneNumber: data.phoneNumber,
+                flatNo:      data.flatNo.trim(),
                 vehicles: {
                     bikes: {
-                        count: bikeCount,
-                        registrationNumbers: bikeRegs.map((r) =>
-                            r.trim().toUpperCase()
-                        ),
+                        count: data.vehicles.bikes.count,
+                        registrationNumbers: data.vehicles.bikes.registrationNumbers.map((r) => r.trim().toUpperCase()),
                     },
                     cars: {
-                        count: carCount,
-                        list: carRegs.map((r) => ({
-                            regNo: r.regNo.trim().toUpperCase(),
-                            fastTag: r.fastTag,
+                        count: data.vehicles.cars.count,
+                        list:  data.vehicles.cars.list.map((r) => ({
+                            regNo:       r.regNo.trim().toUpperCase(),
+                            fastTag:     r.fastTag,
                             parkingSlot: r.parkingSlot.trim(),
                         })),
                     },
                 },
             };
 
-            if (member?.type === 'owner') {
-                // index2 is not updated here, it's a file
-            } else {
+            if (member?.type === 'tenant') {
                 payload.tenantDetails = {
-                    agreement: agreement, // keep existing
-                    lastDayOfAgreement: lastDayOfAgreement || null,
+                    agreement:            initialValues.currentFileUrl ?? '',
+                    lastDayOfAgreement:   data.lastDayOfAgreement || null,
                 };
             }
 
             await api.put(`/admin/members/${id}`, payload);
             toast.success('Member updated successfully!');
             navigate('/admin/members');
-        } catch (error: any) {
-            toast.error(
-                error.response?.data?.message || 'Failed to update member'
-            );
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || 'Failed to update member');
         } finally {
             setSaving(false);
         }
     };
 
-    if (loading) {
-        return (
-            <div className="loading-overlay">
-                <div className="loading-spinner"></div>
-                <span className="loading-text">Loading member details...</span>
-            </div>
-        );
-    }
+    // ── Guards ────────────────────────────────────────────────────────────────
+    if (loading) return <LoadingScreen message="Loading member details..." />;
+    if (!member)  return <EmptyState icon="❌" title="Member not found" />;
 
-    if (!member) {
-        return (
-            <div className="page-wrapper">
-                <div className="empty-state">
-                    <div className="empty-state__icon">❌</div>
-                    <h3 className="empty-state__title">Member not found</h3>
-                </div>
-            </div>
-        );
-    }
+    const fileLabel = member.type === 'owner' ? 'Index 2 File' : 'Agreement File';
 
     return (
         <div className="page-wrapper" style={{ maxWidth: '700px' }}>
@@ -181,305 +115,44 @@ const EditMemberPage: React.FC = () => {
 
             <div className="card card--elevated">
                 <div className="card__header">
-                    <h2 className="card__title">
-                        ✏️ Edit Member
-                    </h2>
-                    <span
-                        className={`badge ${member.type === 'owner' ? 'badge--owner' : 'badge--tenant'
-                            }`}
-                    >
+                    <h2 className="card__title">✏️ Edit Member</h2>
+                    <span className={`badge ${member.type === 'owner' ? 'badge--owner' : 'badge--tenant'}`}>
                         {member.type === 'owner' ? '🏠 Owner' : '📋 Tenant'}
                     </span>
                 </div>
                 <div className="card__body">
-                    <form onSubmit={handleSave} noValidate>
-                        {/* Read-only fields */}
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">Full Name</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={member.fullName}
-                                    disabled
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Wing</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={`Wing ${member.wing}`}
-                                    disabled
-                                />
-                            </div>
-                        </div>
-
-                        {/* Editable: Phone */}
-                        <div className="form-group">
-                            <label className="form-label form-label--required" htmlFor="edit-phone">
-                                Phone Number
-                            </label>
-                            <input
-                                id="edit-phone"
-                                type="tel"
-                                className="form-input"
-                                value={phoneNumber}
-                                onChange={(e) => {
-                                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                    setPhoneNumber(val);
-                                }}
-                            />
-                        </div>
-
-                        {/* Editable: Flat No */}
-                        <div className="form-group" style={{ marginTop: '1rem' }}>
-                            <label className="form-label form-label--required" htmlFor="edit-flatNo">
-                                Flat Number
-                            </label>
-                            <input
-                                id="edit-flatNo"
-                                type="text"
-                                className="form-input"
-                                value={flatNo}
-                                onChange={(e) => setFlatNo(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Bikes */}
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="edit-bike-count">
-                                Number of Bikes
-                            </label>
-                            <input
-                                id="edit-bike-count"
-                                type="number"
-                                min="0"
-                                className="form-input"
-                                value={bikeCount}
-                                onChange={(e) =>
-                                    handleBikeCountChange(parseInt(e.target.value) || 0)
-                                }
-                            />
-                        </div>
-
-                        {bikeCount > 0 && (
-                            <div className="dynamic-fields">
-                                <div className="dynamic-fields__title">
-                                    🏍️ Bike Registration Numbers
-                                </div>
-                                {Array.from({ length: bikeCount }).map((_, i) => (
-                                    <div className="form-group" key={`bike-${i}`}>
-                                        <label className="form-label form-label--required" htmlFor={`edit-bikeReg${i}`}>
-                                            Bike #{i + 1}
-                                        </label>
-                                        <input
-                                            id={`edit-bikeReg${i}`}
-                                            type="text"
-                                            className="form-input"
-                                            placeholder="e.g. MH12AB1234"
-                                            value={bikeRegs[i] || ''}
-                                            onChange={(e) => {
-                                                const newRegs = [...bikeRegs];
-                                                newRegs[i] = e.target.value;
-                                                setBikeRegs(newRegs);
-                                            }}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Cars */}
-                        <div className="form-group" style={{ marginTop: bikeCount > 0 ? '1rem' : undefined }}>
-                            <label className="form-label" htmlFor="edit-car-count">
-                                Number of Cars
-                            </label>
-                            <input
-                                id="edit-car-count"
-                                type="number"
-                                min="0"
-                                className="form-input"
-                                value={carCount}
-                                onChange={(e) =>
-                                    handleCarCountChange(parseInt(e.target.value) || 0)
-                                }
-                            />
-                        </div>
-
-                        {carCount > 0 && (
-                            <div className="dynamic-fields">
-                                <div className="dynamic-fields__title">
-                                    🚗 Car Details
-                                </div>
-                                {Array.from({ length: carCount }).map((_, i) => (
-                                    <div
-                                        key={`car-${i}`}
-                                        style={{
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: 'var(--border-radius-md)',
-                                            padding: '1rem',
-                                            marginBottom: '0.75rem',
-                                            background: 'var(--gray-50)',
-                                        }}
-                                    >
-                                        <div style={{ fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>
-                                            🚗 Car #{i + 1}
-                                        </div>
-
-                                        {/* Registration Number */}
-                                        <div className="form-group">
-                                            <label className="form-label form-label--required" htmlFor={`edit-carReg${i}`}>
-                                                Registration Number
-                                            </label>
-                                            <input
-                                                id={`edit-carReg${i}`}
-                                                type="text"
-                                                className="form-input"
-                                                placeholder="e.g. MH14XY5678"
-                                                value={carRegs[i]?.regNo || ''}
-                                                onChange={(e) => {
-                                                    const newRegs = carRegs.map((r, idx) =>
-                                                        idx === i ? { ...r, regNo: e.target.value } : r
-                                                    );
-                                                    setCarRegs(newRegs);
-                                                }}
-                                            />
-                                        </div>
-
-                                        {/* Parking Slot */}
-                                        <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                                            <label className="form-label" htmlFor={`edit-carParking${i}`}>
-                                                🅿️ Parking Slot
-                                            </label>
-                                            <input
-                                                id={`edit-carParking${i}`}
-                                                type="text"
-                                                className="form-input"
-                                                placeholder="e.g. B-12"
-                                                value={carRegs[i]?.parkingSlot || ''}
-                                                onChange={(e) => {
-                                                    const newRegs = carRegs.map((r, idx) =>
-                                                        idx === i ? { ...r, parkingSlot: e.target.value } : r
-                                                    );
-                                                    setCarRegs(newRegs);
-                                                }}
-                                            />
-                                        </div>
-
-                                        {/* FASTag */}
-                                        <div
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.6rem',
-                                                marginTop: '0.75rem',
-                                            }}
-                                        >
-                                            <input
-                                                id={`edit-carFasttag${i}`}
-                                                type="checkbox"
-                                                style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer' }}
-                                                checked={carRegs[i]?.fastTag || false}
-                                                onChange={(e) => {
-                                                    const newRegs = carRegs.map((r, idx) =>
-                                                        idx === i ? { ...r, fastTag: e.target.checked } : r
-                                                    );
-                                                    setCarRegs(newRegs);
-                                                }}
-                                            />
-                                            <label
-                                                htmlFor={`edit-carFasttag${i}`}
-                                                style={{ cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}
-                                            >
-                                                📡 FASTag Enabled
-                                            </label>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Owner-specific */}
-                        {member.type === 'owner' && (
-                            <div className="form-group" style={{ marginTop: '1rem' }}>
-                                <label className="form-label">
-                                    Index 2 File
-                                </label>
-                                {index2 ? (
-                                    <div style={{ padding: '0.75rem', background: 'var(--gray-50)', borderRadius: 'var(--border-radius-md)' }}>
-                                        <a href={index2} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-600)', fontWeight: 600 }}>
-                                            📄 View Uploaded File
-                                        </a>
-                                    </div>
-                                ) : (
-                                    <div style={{ color: 'var(--text-muted)' }}>No file uploaded.</div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Tenant-specific */}
-                        {member.type === 'tenant' && (
-                            <>
-                                <div className="form-group" style={{ marginTop: '1rem' }}>
-                                    <label className="form-label">
-                                        Agreement File
-                                    </label>
-                                    {agreement ? (
-                                        <div style={{ padding: '0.75rem', background: 'var(--gray-50)', borderRadius: 'var(--border-radius-md)' }}>
-                                            <a href={agreement} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-600)', fontWeight: 600 }}>
-                                                📄 View Uploaded Agreement
-                                            </a>
-                                        </div>
-                                    ) : (
-                                        <div style={{ color: 'var(--text-muted)' }}>No file uploaded.</div>
-                                    )}
-                                </div>
-                                <div className="form-group">
-                                    <label
-                                        className="form-label form-label--required"
-                                        htmlFor="edit-lastDay"
-                                    >
-                                        Last Day of Agreement
-                                    </label>
-                                    <input
-                                        id="edit-lastDay"
-                                        type="date"
-                                        className="form-input"
-                                        value={lastDayOfAgreement}
-                                        onChange={(e) => setLastDayOfAgreement(e.target.value)}
-                                    />
-                                </div>
-                            </>
-                        )}
-
-                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                            <button
-                                type="submit"
-                                className="btn btn--primary btn--lg"
-                                disabled={saving}
-                                style={{ flex: 1 }}
-                                id="save-member-btn"
-                            >
-                                {saving ? (
-                                    <>
-                                        <span className="spinner"></span>
-                                        Saving...
-                                    </>
-                                ) : (
-                                    'Save Changes'
-                                )}
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn--secondary btn--lg"
-                                onClick={() => navigate('/admin/members')}
-                                id="cancel-edit-btn"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
+                    <MemberForm
+                        initialValues={initialValues}
+                        config={{
+                            memberType:       member.type,
+                            idPrefix:         'edit',
+                            // Personal fields — fullName read-only, phone + flat editable
+                            showFullName:     true,
+                            fullNameEditable: false,
+                            phoneEditable:    true,
+                            flatNoEditable:   true,
+                            // Wing display
+                            showWing:         true,
+                            wingDisplay:      `Wing ${member.wing}`,
+                            // File — view only (admin doesn't re-upload)
+                            fileMode:         'view-only',
+                            fileLabel,
+                            // Submit
+                            submitLabel:      'Save Changes',
+                            submitting:       saving,
+                            extraActions: (
+                                <button
+                                    type="button"
+                                    className="btn btn--secondary btn--lg"
+                                    onClick={() => navigate('/admin/members')}
+                                    id="cancel-edit-btn"
+                                >
+                                    Cancel
+                                </button>
+                            ),
+                        }}
+                        onSubmit={handleSubmit}
+                    />
                 </div>
             </div>
         </div>

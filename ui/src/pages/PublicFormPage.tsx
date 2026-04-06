@@ -1,23 +1,14 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { VALID_WINGS, VALID_TYPES } from '../types';
 import type { WingType, MemberType } from '../types';
-
-interface CarEntry {
-    regNo: string;
-    fastTag: boolean;
-    parkingSlot: string;
-}
-
-interface FormErrors {
-    [key: string]: string;
-}
+import { MemberForm, emptyVehicles } from '../components/member';
+import type { MemberFormData } from '../components/member';
 
 const PublicFormPage: React.FC = () => {
     const { wing, type } = useParams<{ wing: string; type: string }>();
-    const navigate = useNavigate();
 
     const wingUpper = (wing?.toUpperCase() || '') as WingType;
     const typeLower = (type?.toLowerCase() || '') as MemberType;
@@ -25,23 +16,10 @@ const PublicFormPage: React.FC = () => {
     const isValidWing = VALID_WINGS.includes(wingUpper);
     const isValidType = VALID_TYPES.includes(typeLower);
 
-    const [formData, setFormData] = useState({
-        fullName: '',
-        phoneNumber: '',
-        flatNo: '',
-        bikeCount: 0,
-        bikeRegistrations: [] as string[],
-        carCount: 0,
-        carRegistrations: [] as CarEntry[],
-        index2: null as File | null,
-        agreement: null as File | null,
-        lastDayOfAgreement: '',
-    });
-
-    const [errors, setErrors] = useState<FormErrors>({});
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading]     = useState(false);
     const [submitted, setSubmitted] = useState(false);
 
+    // ── Invalid URL guard ─────────────────────────────────────────────────────
     if (!isValidWing || !isValidType) {
         return (
             <div className="app-layout">
@@ -57,170 +35,58 @@ const PublicFormPage: React.FC = () => {
         );
     }
 
-    const validate = (): boolean => {
-        const newErrors: FormErrors = {};
-
-        if (!formData.fullName || formData.fullName.trim().length < 3) {
-            newErrors.fullName = 'Full name must be at least 3 characters';
-        }
-
-        if (!formData.phoneNumber || !/^\d{10}$/.test(formData.phoneNumber)) {
-            newErrors.phoneNumber = 'Phone number must be exactly 10 digits';
-        }
-
-        if (!formData.flatNo || formData.flatNo.trim().length === 0) {
-            newErrors.flatNo = 'Flat number is required';
-        }
-
-        if (formData.bikeCount < 0) {
-            newErrors.bikeCount = 'Bike count cannot be negative';
-        }
-
-        if (formData.bikeCount > 0) {
-            for (let i = 0; i < formData.bikeCount; i++) {
-                if (!formData.bikeRegistrations[i]?.trim()) {
-                    newErrors[`bikeReg${i}`] = `Bike registration #${i + 1} is required`;
-                }
-            }
-        }
-
-        if (formData.carCount < 0) {
-            newErrors.carCount = 'Car count cannot be negative';
-        }
-
-        if (formData.carCount > 0) {
-            for (let i = 0; i < formData.carCount; i++) {
-                if (!formData.carRegistrations[i]?.regNo?.trim()) {
-                    newErrors[`carReg${i}`] = `Car registration #${i + 1} is required`;
-                }
-            }
-        }
-
-        if (typeLower === 'owner') {
-            if (!formData.index2) {
-                newErrors.index2 = 'Index 2 document is required for owners';
-            }
-        }
-
-        if (typeLower === 'tenant') {
-            if (!formData.agreement) {
-                newErrors.agreement = 'Agreement file is required for tenants';
-            }
-            if (!formData.lastDayOfAgreement) {
-                newErrors.lastDayOfAgreement = 'Last day of agreement is required';
-            }
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleBikeCountChange = (count: number) => {
-        const newCount = Math.max(0, count);
-        const newRegs = [...formData.bikeRegistrations];
-        while (newRegs.length < newCount) newRegs.push('');
-        setFormData({
-            ...formData,
-            bikeCount: newCount,
-            bikeRegistrations: newRegs.slice(0, newCount),
-        });
-    };
-
-    const handleCarCountChange = (count: number) => {
-        const newCount = Math.max(0, count);
-        const newRegs = [...formData.carRegistrations];
-        while (newRegs.length < newCount)
-            newRegs.push({ regNo: '', fastTag: false, parkingSlot: '' });
-        setFormData({
-            ...formData,
-            carCount: newCount,
-            carRegistrations: newRegs.slice(0, newCount),
-        });
-    };
-
-    const handleBikeRegChange = (index: number, value: string) => {
-        const newRegs = [...formData.bikeRegistrations];
-        newRegs[index] = value;
-        setFormData({ ...formData, bikeRegistrations: newRegs });
-    };
-
-    const handleCarFieldChange = (index: number, field: keyof CarEntry, value: string | boolean) => {
-        const newRegs = formData.carRegistrations.map((r, i) =>
-            i === index ? { ...r, [field]: value } : r
-        );
-        setFormData({ ...formData, carRegistrations: newRegs });
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!validate()) {
-            toast.error('Please fix the errors before submitting');
-            return;
-        }
-
+    // ── Submit — parent handles the API call ──────────────────────────────────
+    const handleSubmit = async (data: MemberFormData) => {
         setLoading(true);
-
         try {
-            const formDataPayload = new FormData();
-            formDataPayload.append('fullName', formData.fullName.trim());
-            formDataPayload.append('phoneNumber', formData.phoneNumber);
-            formDataPayload.append('flatNo', formData.flatNo.trim());
-            formDataPayload.append('wing', wingUpper);
-            formDataPayload.append('type', typeLower);
-
-            formDataPayload.append('vehicles', JSON.stringify({
+            const payload = new FormData();
+            payload.append('fullName',    data.fullName.trim());
+            payload.append('phoneNumber', data.phoneNumber);
+            payload.append('flatNo',      data.flatNo.trim());
+            payload.append('wing',        wingUpper);
+            payload.append('type',        typeLower);
+            payload.append('vehicles', JSON.stringify({
                 bikes: {
-                    count: formData.bikeCount,
-                    registrationNumbers: formData.bikeRegistrations.map((r) =>
-                        r.trim().toUpperCase()
-                    ),
+                    count: data.vehicles.bikes.count,
+                    registrationNumbers: data.vehicles.bikes.registrationNumbers.map((r) => r.trim().toUpperCase()),
                 },
                 cars: {
-                    count: formData.carCount,
-                    list: formData.carRegistrations.map((r) => ({
-                        regNo: r.regNo.trim().toUpperCase(),
-                        fastTag: r.fastTag,
+                    count: data.vehicles.cars.count,
+                    list:  data.vehicles.cars.list.map((r) => ({
+                        regNo:       r.regNo.trim().toUpperCase(),
+                        fastTag:     r.fastTag,
                         parkingSlot: r.parkingSlot.trim(),
                     })),
                 },
             }));
 
             if (typeLower === 'owner') {
-                if (formData.index2) {
-                    formDataPayload.append('index2', formData.index2);
-                }
+                if (data.file) payload.append('index2', data.file);
             } else {
-                if (formData.agreement) {
-                    formDataPayload.append('agreement', formData.agreement);
-                }
-                formDataPayload.append('tenantDetails', JSON.stringify({
-                    lastDayOfAgreement: formData.lastDayOfAgreement,
-                }));
+                if (data.file) payload.append('agreement', data.file);
+                payload.append('tenantDetails', JSON.stringify({ lastDayOfAgreement: data.lastDayOfAgreement }));
             }
 
-            await api.post('/public/member', formDataPayload, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
+            await api.post('/public/member', payload, { headers: { 'Content-Type': 'multipart/form-data' } });
             toast.success('Member registered successfully!');
             setSubmitted(true);
-        } catch (error: any) {
-            const message =
-                error.response?.data?.message || 'Failed to register member';
-            toast.error(message);
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || 'Failed to register member');
         } finally {
             setLoading(false);
         }
     };
 
+    // ── Initial values (blank for public form) ────────────────────────────────
+    const blankValues = { vehicles: emptyVehicles() };
+
+    // ── Success screen ────────────────────────────────────────────────────────
     if (submitted) {
         return (
             <div className="app-layout">
                 <div className="hero">
                     <div className="hero__content">
-                        <div className="hero__wing-badge">
-                            🏢 Wing {wingUpper}
-                        </div>
+                        <div className="hero__wing-badge">🏢 Wing {wingUpper}</div>
                         <h1 className="hero__title">Society Book Registration</h1>
                     </div>
                 </div>
@@ -234,21 +100,7 @@ const PublicFormPage: React.FC = () => {
                         </p>
                         <button
                             className="btn btn--primary btn--lg"
-                            onClick={() => {
-                                setSubmitted(false);
-                                setFormData({
-                                    fullName: '',
-                                    phoneNumber: '',
-                                    flatNo: '',
-                                    bikeCount: 0,
-                                    bikeRegistrations: [],
-                                    carCount: 0,
-                                    carRegistrations: [],
-                                    index2: null,
-                                    agreement: null,
-                                    lastDayOfAgreement: '',
-                                });
-                            }}
+                            onClick={() => setSubmitted(false)}
                             id="register-another-btn"
                         >
                             Register Another Member
@@ -259,6 +111,7 @@ const PublicFormPage: React.FC = () => {
         );
     }
 
+    // ── Form ──────────────────────────────────────────────────────────────────
     return (
         <div className="app-layout">
             <div className="hero">
@@ -276,324 +129,33 @@ const PublicFormPage: React.FC = () => {
             <div className="container container--narrow" style={{ padding: '2rem 1.5rem' }}>
                 <div className="card card--elevated">
                     <div className="card__body">
-                        <form onSubmit={handleSubmit} noValidate>
-                            {/* Full Name */}
-                            <div className="form-group">
-                                <label className="form-label form-label--required" htmlFor="fullName">
-                                    Full Name
-                                </label>
-                                <input
-                                    id="fullName"
-                                    type="text"
-                                    className={`form-input ${errors.fullName ? 'form-input--error' : ''}`}
-                                    placeholder="Enter your full name"
-                                    value={formData.fullName}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, fullName: e.target.value })
-                                    }
-                                />
-                                {errors.fullName && (
-                                    <div className="form-error">⚠ {errors.fullName}</div>
-                                )}
-                            </div>
-
-                            {/* Phone Number */}
-                            <div className="form-group">
-                                <label className="form-label form-label--required" htmlFor="phoneNumber">
-                                    Phone Number
-                                </label>
-                                <input
-                                    id="phoneNumber"
-                                    type="tel"
-                                    className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
-                                    placeholder="Enter 10-digit phone number"
-                                    value={formData.phoneNumber}
-                                    onChange={(e) => {
-                                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                        setFormData({ ...formData, phoneNumber: val });
-                                    }}
-                                />
-                                {errors.phoneNumber && (
-                                    <div className="form-error">⚠ {errors.phoneNumber}</div>
-                                )}
-                            </div>
-
-                            {/* Flat No */}
-                            <div className="form-group">
-                                <label className="form-label form-label--required" htmlFor="flatNo">
-                                    Flat Number
-                                </label>
-                                <input
-                                    id="flatNo"
-                                    type="text"
-                                    className={`form-input ${errors.flatNo ? 'form-input--error' : ''}`}
-                                    placeholder="Enter flat number (e.g. 101)"
-                                    value={formData.flatNo}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, flatNo: e.target.value })
-                                    }
-                                />
-                                {errors.flatNo && (
-                                    <div className="form-error">⚠ {errors.flatNo}</div>
-                                )}
-                            </div>
-
-                            {/* Wing & Type (read-only) */}
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label">Wing</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        value={`Wing ${wingUpper}`}
-                                        disabled
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Type</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        value={typeLower === 'owner' ? 'Owner' : 'Tenant'}
-                                        disabled
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Bikes */}
-                            <div className="form-group">
-                                <label className="form-label form-label--required" htmlFor="bikeCount">
-                                    Number of Bikes
-                                </label>
-                                <input
-                                    id="bikeCount"
-                                    type="number"
-                                    min="0"
-                                    className={`form-input ${errors.bikeCount ? 'form-input--error' : ''}`}
-                                    value={formData.bikeCount}
-                                    onChange={(e) => handleBikeCountChange(parseInt(e.target.value) || 0)}
-                                />
-                                {errors.bikeCount && (
-                                    <div className="form-error">⚠ {errors.bikeCount}</div>
-                                )}
-                            </div>
-
-                            {formData.bikeCount > 0 && (
-                                <div className="dynamic-fields">
-                                    <div className="dynamic-fields__title">
-                                        🏍️ Bike Registration Numbers
-                                    </div>
-                                    {Array.from({ length: formData.bikeCount }).map((_, i) => (
-                                        <div className="form-group" key={`bike-${i}`}>
-                                            <label className="form-label form-label--required" htmlFor={`bikeReg${i}`}>
-                                                Bike #{i + 1} Registration
-                                            </label>
-                                            <input
-                                                id={`bikeReg${i}`}
-                                                type="text"
-                                                className={`form-input ${errors[`bikeReg${i}`] ? 'form-input--error' : ''}`}
-                                                placeholder="e.g. MH12AB1234"
-                                                value={formData.bikeRegistrations[i] || ''}
-                                                onChange={(e) => handleBikeRegChange(i, e.target.value)}
-                                            />
-                                            {errors[`bikeReg${i}`] && (
-                                                <div className="form-error">⚠ {errors[`bikeReg${i}`]}</div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Cars */}
-                            <div className="form-group" style={{ marginTop: formData.bikeCount > 0 ? '1.25rem' : undefined }}>
-                                <label className="form-label form-label--required" htmlFor="carCount">
-                                    Number of Cars
-                                </label>
-                                <input
-                                    id="carCount"
-                                    type="number"
-                                    min="0"
-                                    className={`form-input ${errors.carCount ? 'form-input--error' : ''}`}
-                                    value={formData.carCount}
-                                    onChange={(e) => handleCarCountChange(parseInt(e.target.value) || 0)}
-                                />
-                                {errors.carCount && (
-                                    <div className="form-error">⚠ {errors.carCount}</div>
-                                )}
-                            </div>
-
-                            {formData.carCount > 0 && (
-                                <div className="dynamic-fields">
-                                    <div className="dynamic-fields__title">
-                                        🚗 Car Details
-                                    </div>
-                                    {Array.from({ length: formData.carCount }).map((_, i) => (
-                                        <div
-                                            key={`car-${i}`}
-                                            style={{
-                                                border: '1px solid var(--border-color)',
-                                                borderRadius: 'var(--border-radius-md)',
-                                                padding: '1rem',
-                                                marginBottom: '0.75rem',
-                                                background: 'var(--gray-50)',
-                                            }}
-                                        >
-                                            <div style={{ fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>
-                                                🚗 Car #{i + 1}
-                                            </div>
-
-                                            {/* Registration Number */}
-                                            <div className="form-group">
-                                                <label className="form-label form-label--required" htmlFor={`carReg${i}`}>
-                                                    Registration Number
-                                                </label>
-                                                <input
-                                                    id={`carReg${i}`}
-                                                    type="text"
-                                                    className={`form-input ${errors[`carReg${i}`] ? 'form-input--error' : ''}`}
-                                                    placeholder="e.g. MH14XY5678"
-                                                    value={formData.carRegistrations[i]?.regNo || ''}
-                                                    onChange={(e) => handleCarFieldChange(i, 'regNo', e.target.value)}
-                                                />
-                                                {errors[`carReg${i}`] && (
-                                                    <div className="form-error">⚠ {errors[`carReg${i}`]}</div>
-                                                )}
-                                            </div>
-
-                                            {/* Parking Slot */}
-                                            <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                                                <label className="form-label" htmlFor={`carParking${i}`}>
-                                                    🅿️ Parking Slot
-                                                </label>
-                                                <input
-                                                    id={`carParking${i}`}
-                                                    type="text"
-                                                    className="form-input"
-                                                    placeholder="e.g. B-12"
-                                                    value={formData.carRegistrations[i]?.parkingSlot || ''}
-                                                    onChange={(e) => handleCarFieldChange(i, 'parkingSlot', e.target.value)}
-                                                />
-                                            </div>
-
-                                            {/* FASTag */}
-                                            <div
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '0.6rem',
-                                                    marginTop: '0.75rem',
-                                                }}
-                                            >
-                                                <input
-                                                    id={`carFasttag${i}`}
-                                                    type="checkbox"
-                                                    style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer' }}
-                                                    checked={formData.carRegistrations[i]?.fastTag || false}
-                                                    onChange={(e) => handleCarFieldChange(i, 'fastTag', e.target.checked)}
-                                                />
-                                                <label
-                                                    htmlFor={`carFasttag${i}`}
-                                                    style={{ cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}
-                                                >
-                                                    📡 FASTag Enabled
-                                                </label>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Owner-specific: index2 */}
-                            {typeLower === 'owner' && (
-                                <div className="form-group" style={{ marginTop: '1.25rem' }}>
-                                    <label className="form-label form-label--required" htmlFor="index2">
-                                        Index 2
-                                    </label>
-                                    <input
-                                        id="index2"
-                                        type="file"
-                                        accept="image/*,.pdf"
-                                        className={`form-input ${errors.index2 ? 'form-input--error' : ''}`}
-                                        onChange={(e) => {
-                                            const file = e.target.files ? e.target.files[0] : null;
-                                            setFormData({ ...formData, index2: file });
-                                        }}
-                                        style={{ padding: '0.5rem' }}
-                                    />
-                                    {errors.index2 && (
-                                        <div className="form-error">⚠ {errors.index2}</div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Tenant-specific: agreement + lastDayOfAgreement */}
-                            {typeLower === 'tenant' && (
-                                <>
-                                    <div className="form-group" style={{ marginTop: '1.25rem' }}>
-                                        <label className="form-label form-label--required" htmlFor="agreement">
-                                            Agreement File
-                                        </label>
-                                        <input
-                                            id="agreement"
-                                            type="file"
-                                            accept="image/*,.pdf"
-                                            className={`form-input ${errors.agreement ? 'form-input--error' : ''}`}
-                                            onChange={(e) => {
-                                                const file = e.target.files ? e.target.files[0] : null;
-                                                setFormData({ ...formData, agreement: file });
-                                            }}
-                                            style={{ padding: '0.5rem' }}
-                                        />
-                                        {errors.agreement && (
-                                            <div className="form-error">⚠ {errors.agreement}</div>
-                                        )}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label
-                                            className="form-label form-label--required"
-                                            htmlFor="lastDayOfAgreement"
-                                        >
-                                            Last Day of Agreement
-                                        </label>
-                                        <input
-                                            id="lastDayOfAgreement"
-                                            type="date"
-                                            className={`form-input ${errors.lastDayOfAgreement ? 'form-input--error' : ''}`}
-                                            value={formData.lastDayOfAgreement}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    lastDayOfAgreement: e.target.value,
-                                                })
-                                            }
-                                        />
-                                        {errors.lastDayOfAgreement && (
-                                            <div className="form-error">
-                                                ⚠ {errors.lastDayOfAgreement}
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
-                            )}
-
-                            <button
-                                type="submit"
-                                className="btn btn--primary btn--lg btn--block"
-                                disabled={loading}
-                                style={{ marginTop: '1.5rem' }}
-                                id="submit-member-btn"
-                            >
-                                {loading ? (
-                                    <>
-                                        <span className="spinner"></span>
-                                        Submitting...
-                                    </>
-                                ) : (
-                                    'Submit Registration'
-                                )}
-                            </button>
-                        </form>
+                        <MemberForm
+                            initialValues={blankValues}
+                            config={{
+                                memberType:       typeLower,
+                                idPrefix:         'pub',
+                                // All personal fields visible & editable
+                                showFullName:     true,
+                                fullNameEditable: true,
+                                phoneEditable:    true,
+                                flatNoEditable:   true,
+                                // Show read-only wing & type from URL
+                                showWing:         true,
+                                wingDisplay:      `Wing ${wingUpper}`,
+                                showType:         true,
+                                typeDisplay:      typeLower === 'owner' ? 'Owner' : 'Tenant',
+                                // File upload required
+                                fileMode:         'upload',
+                                fileLabel:        typeLower === 'owner' ? 'Index 2 Document' : 'Rental Agreement',
+                                fileRequired:     true,
+                                // Inline validation for public form UX
+                                validationStyle:  'inline',
+                                // Submit
+                                submitLabel:      'Submit Registration',
+                                submitting:       loading,
+                            }}
+                            onSubmit={handleSubmit}
+                        />
                     </div>
                 </div>
             </div>
