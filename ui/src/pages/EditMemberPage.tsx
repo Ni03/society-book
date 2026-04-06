@@ -28,12 +28,14 @@ const EditMemberPage: React.FC = () => {
                     const m = res.data.data;
                     setMember(m);
                     setInitialValues({
-                        fullName:    m.fullName,
+                        fullName: m.fullName,
+                        email: m.email ?? '',
+                        caste: m.caste ?? '',
                         phoneNumber: m.phoneNumber,
-                        flatNo:      m.flatNo || '',
+                        flatNo: m.flatNo || '',
                         vehicles: {
                             bikes: { ...m.vehicles.bikes, registrationNumbers: [...m.vehicles.bikes.registrationNumbers] },
-                            cars:  { ...m.vehicles.cars,  list: [...m.vehicles.cars.list] },
+                            cars: { ...m.vehicles.cars, list: [...m.vehicles.cars.list] },
                         },
                         lastDayOfAgreement:
                             m.tenantDetails?.lastDayOfAgreement
@@ -61,7 +63,9 @@ const EditMemberPage: React.FC = () => {
         try {
             const payload: Record<string, unknown> = {
                 phoneNumber: data.phoneNumber,
-                flatNo:      data.flatNo.trim(),
+                email: data.email.trim(),
+                caste: data.caste,
+                flatNo: data.flatNo.trim(),
                 vehicles: {
                     bikes: {
                         count: data.vehicles.bikes.count,
@@ -69,9 +73,9 @@ const EditMemberPage: React.FC = () => {
                     },
                     cars: {
                         count: data.vehicles.cars.count,
-                        list:  data.vehicles.cars.list.map((r) => ({
-                            regNo:       r.regNo.trim().toUpperCase(),
-                            fastTag:     r.fastTag,
+                        list: data.vehicles.cars.list.map((r) => ({
+                            regNo: r.regNo.trim().toUpperCase(),
+                            fastTag: r.fastTag,
                             parkingSlot: r.parkingSlot.trim(),
                         })),
                     },
@@ -80,8 +84,8 @@ const EditMemberPage: React.FC = () => {
 
             if (member?.type === 'tenant') {
                 payload.tenantDetails = {
-                    agreement:            initialValues.currentFileUrl ?? '',
-                    lastDayOfAgreement:   data.lastDayOfAgreement || null,
+                    agreement: initialValues.currentFileUrl ?? '',
+                    lastDayOfAgreement: data.lastDayOfAgreement || null,
                 };
             }
 
@@ -97,7 +101,7 @@ const EditMemberPage: React.FC = () => {
 
     // ── Guards ────────────────────────────────────────────────────────────────
     if (loading) return <LoadingScreen message="Loading member details..." />;
-    if (!member)  return <EmptyState icon="❌" title="Member not found" />;
+    if (!member) return <EmptyState icon="❌" title="Member not found" />;
 
     const fileLabel = member.type === 'owner' ? 'Index 2 File' : 'Agreement File';
 
@@ -124,22 +128,24 @@ const EditMemberPage: React.FC = () => {
                     <MemberForm
                         initialValues={initialValues}
                         config={{
-                            memberType:       member.type,
-                            idPrefix:         'edit',
+                            memberType: member.type,
+                            idPrefix: 'edit',
                             // Personal fields — fullName read-only, phone + flat editable
-                            showFullName:     true,
+                            showFullName: true,
                             fullNameEditable: false,
-                            phoneEditable:    true,
-                            flatNoEditable:   true,
+                            phoneEditable: true,
+                            flatNoEditable: true,
+                            emailEditable: true,
+                            casteEditable: true,
                             // Wing display
-                            showWing:         true,
-                            wingDisplay:      `Wing ${member.wing}`,
+                            showWing: true,
+                            wingDisplay: `Wing ${member.wing}`,
                             // File — view only (admin doesn't re-upload)
-                            fileMode:         'view-only',
+                            fileMode: 'view-only',
                             fileLabel,
                             // Submit
-                            submitLabel:      'Save Changes',
-                            submitting:       saving,
+                            submitLabel: 'Save Changes',
+                            submitting: saving,
                             extraActions: (
                                 <button
                                     type="button"

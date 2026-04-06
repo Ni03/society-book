@@ -41,6 +41,8 @@ const PublicFormPage: React.FC = () => {
         try {
             const payload = new FormData();
             payload.append('fullName',    data.fullName.trim());
+            payload.append('email',       data.email.trim());
+            payload.append('caste',       data.caste);
             payload.append('phoneNumber', data.phoneNumber);
             payload.append('flatNo',      data.flatNo.trim());
             payload.append('wing',        wingUpper);

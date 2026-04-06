@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import type { MemberVehicles } from '../../types';
+import type { MemberVehicles, CasteType } from '../../types';
+import { CASTE_OPTIONS } from '../../types';
 import { VehicleSection, emptyVehicles, FileViewLink, FormField } from './index';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -10,6 +11,8 @@ import { VehicleSection, emptyVehicles, FileViewLink, FormField } from './index'
 /** Values the parent page pre-fills the form with */
 export interface MemberFormInitialValues {
     fullName?: string;
+    email?: string;
+    caste?: CasteType | '';
     phoneNumber?: string;
     flatNo?: string;
     vehicles?: MemberVehicles;
@@ -21,10 +24,12 @@ export interface MemberFormInitialValues {
 /** Data emitted to the parent when the form is submitted */
 export interface MemberFormData {
     fullName: string;
+    email: string;
+    caste: CasteType | '';
     phoneNumber: string;
     flatNo: string;
     vehicles: MemberVehicles;
-    lastDayOfAgreement: string; // '' when not applicable
+    lastDayOfAgreement: string;
     /** The newly selected file to upload, or null if unchanged */
     file: File | null;
 }
@@ -38,57 +43,53 @@ export interface MemberFormConfig {
     memberType: 'owner' | 'tenant';
 
     // ── Field visibility / editability ───────────────────────────────────────
-    /** Show a Full Name field. Default: false */
+    /** Show and allow editing Full Name. Default: false */
     showFullName?: boolean;
-    /** Allow the user to edit Full Name. Default: false */
     fullNameEditable?: boolean;
 
-    /** Allow the user to edit Phone Number. Default: true */
+    /** Allow editing Phone Number. Default: true */
     phoneEditable?: boolean;
-    /** Allow the user to edit Flat Number. Default: true */
+    /** Allow editing Flat Number. Default: true */
     flatNoEditable?: boolean;
+    /** Allow editing Email. Default: true */
+    emailEditable?: boolean;
+    /** Allow editing Caste. Default: true */
+    casteEditable?: boolean;
 
     /** Show a read-only Wing field. Default: false */
     showWing?: boolean;
-    /** Value shown in the Wing field */
     wingDisplay?: string;
 
     /** Show a read-only Type (Owner/Tenant) field. Default: false */
     showType?: boolean;
-    /** Value shown in the Type field */
     typeDisplay?: string;
 
     // ── Attachment / file section ────────────────────────────────────────────
     /**
-     * - 'none'             → hide the file section entirely
+     * - 'none'             → hide the file section
      * - 'upload'           → file input only (PublicFormPage)
-     * - 'view-and-replace' → view current + file input to replace (MemberProfilePage)
-     * - 'view-only'        → view current file, no upload (EditMemberPage)
-     * Default: 'none'
+     * - 'view-and-replace' → view current + optional upload (MemberProfilePage)
+     * - 'view-only'        → view current, no upload (EditMemberPage)
      */
     fileMode?: 'none' | 'upload' | 'view-and-replace' | 'view-only';
-    /** Label shown above the file section */
     fileLabel?: string;
-    /** Whether the file is required (PublicFormPage) */
+    /**
+     * In 'upload' mode: file is always required.
+     * In 'view-and-replace' mode: file is required only when no currentFileUrl exists.
+     * Default: false
+     */
     fileRequired?: boolean;
 
     // ── Submit button ────────────────────────────────────────────────────────
     submitLabel?: string;
-    /** Shows spinner + disables button while parent is calling the API */
     submitting?: boolean;
-
-    // ── Extra action buttons rendered next to Submit ─────────────────────────
     extraActions?: React.ReactNode;
 
     // ── Validation style ─────────────────────────────────────────────────────
-    /**
-     * - 'toast'  → show errors via react-hot-toast (MemberProfilePage, EditMemberPage)
-     * - 'inline' → show errors under each field (PublicFormPage)
-     * Default: 'toast'
-     */
+    /** 'toast' (default) | 'inline' */
     validationStyle?: 'toast' | 'inline';
 
-    /** Unique prefix for all element ids — prevents duplicate-id issues */
+    /** Unique prefix for element ids */
     idPrefix?: string;
 }
 
@@ -105,11 +106,11 @@ interface Props {
 /**
  * MemberForm — single form component used across all three pages.
  *
- * ┌─────────────────────────────────────────────────┐
- * │ To ADD a field:   add state + render it here    │
- * │ To REMOVE a field: delete state + JSX here      │
- * │ Pages never need to change for field changes    │
- * └─────────────────────────────────────────────────┘
+ * ┌──────────────────────────────────────────────────────────────┐
+ * │ To ADD a field:    add state + JSX + validation here        │
+ * │ To REMOVE a field: delete state + JSX here                  │
+ * │ Pages never need to change for field additions/removals     │
+ * └──────────────────────────────────────────────────────────────┘
  */
 const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) => {
     const {
@@ -118,6 +119,8 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
         fullNameEditable   = false,
         phoneEditable      = true,
         flatNoEditable     = true,
+        emailEditable      = true,
+        casteEditable      = true,
         showWing           = false,
         wingDisplay        = '',
         showType           = false,
@@ -132,29 +135,33 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
         idPrefix           = 'mf',
     } = config;
 
-    // ── Internal state ────────────────────────────────────────────────────────
-    const [fullName,            setFullName]           = useState(initialValues.fullName            ?? '');
-    const [phoneNumber,         setPhoneNumber]        = useState(initialValues.phoneNumber         ?? '');
-    const [flatNo,              setFlatNo]             = useState(initialValues.flatNo              ?? '');
-    const [vehicles,            setVehicles]           = useState<MemberVehicles>(initialValues.vehicles ?? emptyVehicles());
-    const [lastDayOfAgreement,  setLastDayOfAgreement] = useState(initialValues.lastDayOfAgreement  ?? '');
-    const [file,                setFile]               = useState<File | null>(null);
+    // ── Internal state — ADD NEW FIELDS HERE ─────────────────────────────────
+    const [fullName,           setFullName]           = useState(initialValues.fullName           ?? '');
+    const [email,              setEmail]              = useState(initialValues.email              ?? '');
+    const [caste,              setCaste]              = useState<CasteType | ''>(initialValues.caste ?? '');
+    const [phoneNumber,        setPhoneNumber]        = useState(initialValues.phoneNumber        ?? '');
+    const [flatNo,             setFlatNo]             = useState(initialValues.flatNo             ?? '');
+    const [vehicles,           setVehicles]           = useState<MemberVehicles>(initialValues.vehicles ?? emptyVehicles());
+    const [lastDayOfAgreement, setLastDayOfAgreement] = useState(initialValues.lastDayOfAgreement ?? '');
+    const [file,               setFile]               = useState<File | null>(null);
 
-    // Inline-error map (only used when validationStyle === 'inline')
+    // Inline validation errors
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    // Re-sync state if initialValues change (e.g. after async fetch)
+    // Re-sync when initialValues change (after async fetch)
     useEffect(() => {
-        setFullName(           initialValues.fullName            ?? '');
-        setPhoneNumber(        initialValues.phoneNumber         ?? '');
-        setFlatNo(             initialValues.flatNo              ?? '');
-        setVehicles(           initialValues.vehicles            ?? emptyVehicles());
-        setLastDayOfAgreement( initialValues.lastDayOfAgreement  ?? '');
+        setFullName(           initialValues.fullName           ?? '');
+        setEmail(              initialValues.email              ?? '');
+        setCaste(              initialValues.caste              ?? '');
+        setPhoneNumber(        initialValues.phoneNumber        ?? '');
+        setFlatNo(             initialValues.flatNo             ?? '');
+        setVehicles(           initialValues.vehicles           ?? emptyVehicles());
+        setLastDayOfAgreement( initialValues.lastDayOfAgreement ?? '');
         setFile(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [JSON.stringify(initialValues)]);
 
-    // ── Validation ────────────────────────────────────────────────────────────
+    // ── Validation — ADD NEW FIELD RULES HERE ────────────────────────────────
     const validate = (): boolean => {
         const inline: Record<string, string> = {};
         const toasts: string[] = [];
@@ -166,6 +173,12 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
 
         if (showFullName && fullNameEditable && (!fullName || fullName.trim().length < 3))
             err('fullName', 'Full name must be at least 3 characters');
+
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+            err('email', 'A valid email address is required');
+
+        if (!caste)
+            err('caste', 'Caste is required');
 
         if (!phoneNumber || !/^\d{10}$/.test(phoneNumber))
             err('phoneNumber', 'Phone number must be exactly 10 digits');
@@ -185,19 +198,27 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
                 err(`carReg${i}`, `Car registration #${i + 1} is required`);
         }
 
-        // Tenant
+        // Tenant: last day
         if (memberType === 'tenant' && !lastDayOfAgreement)
             err('lastDayOfAgreement', 'Last day of agreement is required');
 
-        // File
-        if (fileRequired && (fileMode === 'upload') && !file)
+        // File: required in 'upload' mode, OR in 'view-and-replace' when no existing file
+        const fileIsRequired =
+            fileRequired &&
+            (fileMode === 'upload' ||
+                (fileMode === 'view-and-replace' && !initialValues.currentFileUrl));
+
+        if (fileIsRequired && !file)
             err('file', `${fileLabel} is required`);
 
         if (validationStyle === 'toast') {
             if (toasts.length > 0) { toast.error(toasts[0]); return false; }
         } else {
             setErrors(inline);
-            if (Object.keys(inline).length > 0) { toast.error('Please fix the errors before submitting'); return false; }
+            if (Object.keys(inline).length > 0) {
+                toast.error('Please fix the errors before submitting');
+                return false;
+            }
         }
 
         setErrors({});
@@ -208,10 +229,10 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!validate()) return;
-        await onSubmit({ fullName, phoneNumber, flatNo, vehicles, lastDayOfAgreement, file });
+        await onSubmit({ fullName, email, caste, phoneNumber, flatNo, vehicles, lastDayOfAgreement, file });
     };
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    // ── Render — ADD NEW FIELD JSX HERE ──────────────────────────────────────
     return (
         <form onSubmit={handleSubmit} noValidate>
 
@@ -229,6 +250,39 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
                 />
             )}
 
+            {/* Email */}
+            <FormField
+                id={`${idPrefix}-email`}
+                label="Email Address"
+                type="email"
+                value={email}
+                placeholder="Enter your email address"
+                required
+                disabled={!emailEditable}
+                error={errors.email}
+                onChange={(e) => setEmail(e.target.value)}
+            />
+
+            {/* Caste */}
+            <div className="form-group" style={{ marginTop: '1rem' }}>
+                <label className="form-label form-label--required" htmlFor={`${idPrefix}-caste`}>
+                    Caste
+                </label>
+                <select
+                    id={`${idPrefix}-caste`}
+                    className={`form-input${errors.caste ? ' form-input--error' : ''}`}
+                    value={caste}
+                    disabled={!casteEditable}
+                    onChange={(e) => setCaste(e.target.value as CasteType)}
+                >
+                    <option value="" disabled>Select caste category</option>
+                    {CASTE_OPTIONS.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                    ))}
+                </select>
+                {errors.caste && <div className="form-error">⚠ {errors.caste}</div>}
+            </div>
+
             {/* Phone Number */}
             <FormField
                 id={`${idPrefix}-phone`}
@@ -241,6 +295,7 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
                 maxLength={10}
                 error={errors.phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                style={{ marginTop: '1rem' }}
             />
 
             {/* Flat Number */}
@@ -278,14 +333,14 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
                 />
             </div>
 
-            {/* ── File / Attachment section ─────────────────────────────────── */}
+            {/* ── Attachment / File section ─────────────────────────────────── */}
             {fileMode !== 'none' && (
                 <div className="form-group" style={{ marginTop: '1.5rem' }}>
                     <label className={`form-label${fileRequired ? ' form-label--required' : ''}`}>
                         📎 {fileLabel}
                     </label>
 
-                    {/* View current file (view-only or view-and-replace) */}
+                    {/* View existing file */}
                     {(fileMode === 'view-only' || fileMode === 'view-and-replace') && (
                         <FileViewLink
                             fileUrl={initialValues.currentFileUrl}
@@ -294,7 +349,7 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
                         />
                     )}
 
-                    {/* Newly selected file preview (view-and-replace / upload) */}
+                    {/* Newly selected file preview */}
                     {file && (fileMode === 'upload' || fileMode === 'view-and-replace') && (
                         <div style={{
                             padding: '0.6rem 0.9rem', background: '#ecfdf5',
@@ -310,7 +365,7 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
                         </div>
                     )}
 
-                    {/* File input (upload or view-and-replace) */}
+                    {/* File input */}
                     {(fileMode === 'upload' || fileMode === 'view-and-replace') && (
                         <>
                             <input

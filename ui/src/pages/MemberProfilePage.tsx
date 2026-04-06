@@ -29,12 +29,14 @@ const MemberProfilePage: React.FC = () => {
                     const m = res.data.data;
                     setMember(m);
                     setInitialValues({
-                        fullName:            m.fullName,
-                        phoneNumber:         m.phoneNumber,
-                        flatNo:              m.flatNo || '',
+                        fullName: m.fullName,
+                        email: m.email ?? '',
+                        caste: m.caste ?? '',
+                        phoneNumber: m.phoneNumber,
+                        flatNo: m.flatNo || '',
                         vehicles: {
                             bikes: { ...m.vehicles.bikes, registrationNumbers: [...m.vehicles.bikes.registrationNumbers] },
-                            cars:  { ...m.vehicles.cars,  list: [...m.vehicles.cars.list] },
+                            cars: { ...m.vehicles.cars, list: [...m.vehicles.cars.list] },
                         },
                         lastDayOfAgreement:
                             m.tenantDetails?.lastDayOfAgreement
@@ -61,7 +63,9 @@ const MemberProfilePage: React.FC = () => {
         try {
             const formData = new FormData();
             formData.append('phoneNumber', data.phoneNumber);
-            formData.append('flatNo',      data.flatNo.trim());
+            formData.append('email', data.email.trim());
+            formData.append('caste', data.caste);
+            formData.append('flatNo', data.flatNo.trim());
             formData.append('vehicles', JSON.stringify({
                 bikes: {
                     count: data.vehicles.bikes.count,
@@ -69,9 +73,9 @@ const MemberProfilePage: React.FC = () => {
                 },
                 cars: {
                     count: data.vehicles.cars.count,
-                    list:  data.vehicles.cars.list.map((r) => ({
-                        regNo:       r.regNo.trim().toUpperCase(),
-                        fastTag:     r.fastTag,
+                    list: data.vehicles.cars.list.map((r) => ({
+                        regNo: r.regNo.trim().toUpperCase(),
+                        fastTag: r.fastTag,
                         parkingSlot: r.parkingSlot.trim(),
                     })),
                 },
@@ -98,7 +102,7 @@ const MemberProfilePage: React.FC = () => {
 
     // ── Guards ────────────────────────────────────────────────────────────────
     if (loading) return <LoadingScreen message="Loading your profile..." />;
-    if (!member)  return <EmptyState icon="❌" title="Profile not found" />;
+    if (!member) return <EmptyState icon="❌" title="Profile not found" />;
 
     const attachmentLabel = member.type === 'owner' ? 'Index 2 Document' : 'Rental Agreement';
 
@@ -172,19 +176,23 @@ const MemberProfilePage: React.FC = () => {
                         <MemberForm
                             initialValues={initialValues}
                             config={{
-                                memberType:       member.type,
-                                idPrefix:         'member',
+                                memberType: member.type,
+                                idPrefix: 'member',
                                 // Personal fields — all read-only for member portal
-                                showFullName:     true,
+                                showFullName: true,
                                 fullNameEditable: false,
-                                phoneEditable:    false,
-                                flatNoEditable:   false,
+                                phoneEditable: false,
+                                flatNoEditable: false,
                                 // Attachment
-                                fileMode:         'view-and-replace',
-                                fileLabel:        attachmentLabel,
+                                fileMode: 'view-and-replace',
+                                fileLabel: attachmentLabel,
+                                fileRequired: true,
+                                // Caste / email are read-only in member portal
+                                emailEditable: true,
+                                casteEditable: true,
                                 // Submit
-                                submitLabel:      'Save Changes',
-                                submitting:       saving,
+                                submitLabel: 'Save Changes',
+                                submitting: saving,
                                 extraActions: (
                                     <button
                                         type="button"

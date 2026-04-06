@@ -25,10 +25,15 @@ export interface TenantDetails {
     lastDayOfAgreement: string | null;
 }
 
+export type CasteType = 'Open' | 'SC' | 'ST' | 'OBC' | 'VJ' | 'NT' | 'SBC';
+export const CASTE_OPTIONS: CasteType[] = ['Open', 'SC', 'ST', 'OBC', 'VJ', 'NT', 'SBC'];
+
 export interface Member {
     _id: string;
     fullName: string;
     phoneNumber: string;
+    email: string;
+    caste: CasteType | '';
     flatNo: string;
     wing: string;
     type: 'owner' | 'tenant';
