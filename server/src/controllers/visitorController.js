@@ -1,7 +1,7 @@
 'use strict';
 
 const Visitor = require('../models/Visitor');
-const { sendPushToWing } = require('./pushController');
+const { sendPushToWing, sendPushToFlat } = require('./pushController');
 
 // ── Helper: auto-expire pending visitors past their expiresAt ─────────────────
 const expireOldVisitors = async () => {
@@ -62,6 +62,16 @@ const createVisitor = async (req, res) => {
             loggedByUsername: username || '',
             expiresAt,
         });
+
+        // Push to the flat's MEMBER (they approve/reject their own visitor)
+        sendPushToFlat(visitor.wing, visitor.flatNo, {
+            title: '🔔 New Visitor for Your Flat',
+            body:  `${visitor.visitorName} is at the gate${visitor.purpose ? ' · ' + visitor.purpose : ''}`,
+            tag:       `visitor-pending-${visitor._id}`,
+            visitorId: visitor._id.toString(),
+            url:       `/member/visitors?visitor=${visitor._id}`,
+            requireInteraction: true,
+        }).catch(console.error);
 
         res.status(201).json({
             success: true,
@@ -150,10 +160,11 @@ const approveVisitor = async (req, res) => {
 
         // Push notification to the flat's wing admins
         sendPushToWing(visitor.wing, {
-            title: '✅ Visitor Approved',
-            body:  `${visitor.visitorName} approved for Flat ${visitor.flatNo}, Wing ${visitor.wing}.`,
-            tag:   `visitor-${visitor._id}`,
-            url:   '/notifications',
+            title:     '✅ Visitor Approved',
+            body:      `${visitor.visitorName} approved for Flat ${visitor.wing}-${visitor.flatNo}.`,
+            tag:       `visitor-${visitor._id}`,
+            visitorId: visitor._id.toString(),
+            url:       `/admin/visitors/notifications?visitor=${visitor._id}`,
             requireInteraction: false,
         }).catch(console.error);
 
@@ -191,10 +202,11 @@ const rejectVisitor = async (req, res) => {
 
         // Push notification to the flat's wing admins
         sendPushToWing(visitor.wing, {
-            title: '❌ Visitor Rejected',
-            body:  `${visitor.visitorName} rejected for Flat ${visitor.flatNo}, Wing ${visitor.wing}${visitor.rejectReason ? ': ' + visitor.rejectReason : '.'}`,
-            tag:   `visitor-${visitor._id}`,
-            url:   '/notifications',
+            title:     '❌ Visitor Rejected',
+            body:      `${visitor.visitorName} rejected for Flat ${visitor.wing}-${visitor.flatNo}${visitor.rejectReason ? ': ' + visitor.rejectReason : '.'}`,
+            tag:       `visitor-${visitor._id}`,
+            visitorId: visitor._id.toString(),
+            url:       `/admin/visitors/notifications?visitor=${visitor._id}`,
             requireInteraction: false,
         }).catch(console.error);
 
@@ -316,6 +328,141 @@ const getVisitorPhoto = async (req, res) => {
     }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MEMBER endpoints — residents approve/reject their own visitors
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/member/visitors/pending
+const getPendingVisitorsForMember = async (req, res) => {
+    try {
+        await expireOldVisitors();
+        const { wing, flatNo } = req.member;
+        const visitors = await Visitor.find({
+            wing:   wing.toUpperCase(),
+            flatNo: { $regex: new RegExp(`^${flatNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+            status: 'pending',
+        }).sort({ createdAt: -1 });
+        res.json({ success: true, count: visitors.length, data: visitors.map(sanitize) });
+    } catch (error) {
+        console.error('Member Get Pending Visitors Error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+// PUT /api/member/visitors/:id/approve
+const approveVisitorByMember = async (req, res) => {
+    try {
+        const { wing, flatNo } = req.member;
+        const visitor = await Visitor.findById(req.params.id);
+        if (!visitor) return res.status(404).json({ success: false, message: 'Visitor not found.' });
+
+        // Only allow action on visitors for the member's own flat
+        const flatMatch = new RegExp(`^${flatNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        if (visitor.wing.toUpperCase() !== wing.toUpperCase() || !flatMatch.test(visitor.flatNo)) {
+            return res.status(403).json({ success: false, message: 'This visitor is not for your flat.' });
+        }
+        if (visitor.status !== 'pending') {
+            return res.status(400).json({ success: false, message: `Visitor is already ${visitor.status}.` });
+        }
+
+        visitor.status    = 'approved';
+        visitor.actionedAt = new Date();
+        await visitor.save();
+
+        res.json({ success: true, message: 'Visitor approved.', data: sanitize(visitor) });
+    } catch (error) {
+        console.error('Member Approve Visitor Error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+// PUT /api/member/visitors/:id/reject
+const rejectVisitorByMember = async (req, res) => {
+    try {
+        const { wing, flatNo } = req.member;
+        const reason = req.body?.reason ?? '';    // body may be absent — safe fallback
+        const visitor = await Visitor.findById(req.params.id);
+        if (!visitor) return res.status(404).json({ success: false, message: 'Visitor not found.' });
+
+        const flatMatch = new RegExp(`^${flatNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        if (visitor.wing.toUpperCase() !== wing.toUpperCase() || !flatMatch.test(visitor.flatNo)) {
+            return res.status(403).json({ success: false, message: 'This visitor is not for your flat.' });
+        }
+        if (visitor.status !== 'pending') {
+            return res.status(400).json({ success: false, message: `Visitor is already ${visitor.status}.` });
+        }
+
+        visitor.status      = 'rejected';
+        visitor.rejectReason = (reason || '').trim();
+        visitor.actionedAt  = new Date();
+        await visitor.save();
+
+        res.json({ success: true, message: 'Visitor rejected.', data: sanitize(visitor) });
+    } catch (error) {
+        console.error('Member Reject Visitor Error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+// GET /api/member/visitors/history?status=all&date=2026-04-06
+// Returns full visitor log for the logged-in member's own flat only
+const getVisitorHistoryForMember = async (req, res) => {
+    try {
+        await expireOldVisitors();
+
+        const { wing, flatNo } = req.member;
+        const { status, date } = req.query;
+
+        const flatRegex = new RegExp(`^${flatNo.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i');
+
+        const filter = {
+            wing:   wing.toUpperCase(),
+            flatNo: { $regex: flatRegex },
+        };
+
+        if (status && status !== 'all') {
+            filter.status = status;
+        }
+
+        if (date) {
+            const d = new Date(date);
+            d.setHours(0, 0, 0, 0);
+            const dEnd = new Date(d);
+            dEnd.setHours(23, 59, 59, 999);
+            filter.createdAt = { $gte: d, $lte: dEnd };
+        }
+
+        const visitors = await Visitor.find(filter)
+            .sort({ createdAt: -1 })
+            .limit(200);
+
+        res.json({ success: true, data: visitors.map(sanitize) });
+    } catch (error) {
+        console.error('Member Visitor History Error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+// GET /api/member/visitors/:id/photo
+// Only the member whose flat the visitor was logged for can fetch the photo
+const getMemberVisitorPhoto = async (req, res) => {
+    try {
+        const { wing, flatNo } = req.member;
+        const visitor = await Visitor.findById(req.params.id).select('photo wing flatNo');
+        if (!visitor || !visitor.photo) {
+            return res.status(404).json({ success: false, message: 'Photo not found.' });
+        }
+        const flatRegex = new RegExp(`^${flatNo.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i');
+        if (visitor.wing.toUpperCase() !== wing.toUpperCase() || !flatRegex.test(visitor.flatNo)) {
+            return res.status(403).json({ success: false, message: 'Access denied.' });
+        }
+        res.json({ success: true, photo: visitor.photo });
+    } catch (error) {
+        console.error('Member Get Photo Error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
 module.exports = {
     createVisitor,
     getTodayVisitors,
@@ -327,4 +474,9 @@ module.exports = {
     getVisitorHistory,
     getVisitorPhoto,
     expireOldVisitors,
+    getPendingVisitorsForMember,
+    approveVisitorByMember,
+    rejectVisitorByMember,
+    getVisitorHistoryForMember,
+    getMemberVisitorPhoto,
 };

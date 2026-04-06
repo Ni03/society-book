@@ -75,16 +75,16 @@ const memberLogin = async (req, res) => {
             });
         }
 
-        // Generate JWT with role = 'member'
+        // Generate JWT — 30-day expiry so members stay logged in until they press Logout
         const token = jwt.sign(
             {
                 memberId: member._id,
-                wing: member.wing,
-                flatNo: member.flatNo,
-                role: 'member',
+                wing:     member.wing,
+                flatNo:   member.flatNo,
+                role:     'member',
             },
             process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+            { expiresIn: '30d' }
         );
 
         res.json({

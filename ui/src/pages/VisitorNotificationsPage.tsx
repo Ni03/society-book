@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import type { Visitor } from '../types';
@@ -12,14 +13,23 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const VisitorNotificationsPage: React.FC = () => {
-    const [visitors, setVisitors] = useState<Visitor[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [actioningId, setActioningId] = useState<string | null>(null);
-    const [rejectModal, setRejectModal] = useState<Visitor | null>(null);
+    const [visitors,     setVisitors]     = useState<Visitor[]>([]);
+    const [loading,      setLoading]      = useState(true);
+    const [actioningId,  setActioningId]  = useState<string | null>(null);
+    const [rejectModal,  setRejectModal]  = useState<Visitor | null>(null);
     const [rejectReason, setRejectReason] = useState('');
-    const [photoModal, setPhotoModal] = useState<string | null>(null); // base64 URL
+    const [photoModal,   setPhotoModal]   = useState<string | null>(null);
     const [photoLoading, setPhotoLoading] = useState(false);
 
+    // Quick-action popup triggered by push notification click
+    const [quickModal,    setQuickModal]    = useState<Visitor | null>(null);
+    const [quickPhotoUrl, setQuickPhotoUrl] = useState<string | null>(null);
+
+    const [searchParams, setSearchParams] = useSearchParams();
+    const visitorsRef  = useRef<Visitor[]>([]);    // mirror for SW message handler
+    visitorsRef.current = visitors;
+
+    // ── Fetch ─────────────────────────────────────────────────────────────────
     const fetchNotifications = useCallback(async () => {
         setLoading(true);
         try {
@@ -34,17 +44,69 @@ const VisitorNotificationsPage: React.FC = () => {
 
     useEffect(() => {
         fetchNotifications();
-        // Poll every 30s for native-app-like feel
         const interval = setInterval(fetchNotifications, 30_000);
         return () => clearInterval(interval);
     }, [fetchNotifications]);
 
-    const handleApprove = async (id: string) => {
+    // ── Open quick modal by visitorId ─────────────────────────────────────────
+    const openQuickModal = useCallback(async (visitorId: string) => {
+        // Try from already-loaded list first
+        const existing = visitorsRef.current.find(v => v._id === visitorId);
+        if (existing) {
+            setQuickModal(existing);
+            setQuickPhotoUrl(null);
+            if (existing.hasPhoto) {
+                const res = await api.get(`/admin/visitors/${visitorId}/photo`).catch(() => null);
+                if (res?.data?.success) setQuickPhotoUrl(res.data.photo);
+            }
+            return;
+        }
+        // Fetch individually (e.g. page was just opened from notification)
+        try {
+            const res = await api.get('/admin/visitors/notifications');
+            if (res.data.success) {
+                setVisitors(res.data.data);
+                const v = (res.data.data as Visitor[]).find(v => v._id === visitorId);
+                if (v) {
+                    setQuickModal(v);
+                    setQuickPhotoUrl(null);
+                    if (v.hasPhoto) {
+                        const pRes = await api.get(`/admin/visitors/${visitorId}/photo`).catch(() => null);
+                        if (pRes?.data?.success) setQuickPhotoUrl(pRes.data.photo);
+                    }
+                }
+            }
+        } catch {/* silent */}
+    }, []);
+
+    // ── React to ?visitor=<id> URL param (set by SW deep-link on click) ───────
+    useEffect(() => {
+        const visitorId = searchParams.get('visitor');
+        if (!visitorId) return;
+        // Remove the param from URL so refresh doesn't re-open
+        setSearchParams({}, { replace: true });
+        openQuickModal(visitorId);
+    }, [searchParams, setSearchParams, openQuickModal]);
+
+    // ── React to SW postMessage (app already open when notification is clicked) ─
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            if (event.data?.type === 'VISITOR_NOTIFICATION_CLICK' && event.data?.visitorId) {
+                openQuickModal(event.data.visitorId);
+            }
+        };
+        navigator.serviceWorker?.addEventListener('message', handler);
+        return () => navigator.serviceWorker?.removeEventListener('message', handler);
+    }, [openQuickModal]);
+
+    // ── Actions ───────────────────────────────────────────────────────────────
+    const handleApprove = async (id: string, fromQuick = false) => {
         setActioningId(id);
         try {
             await api.put(`/admin/visitors/${id}/approve`);
             toast.success('✅ Visitor approved!');
             setVisitors(prev => prev.filter(v => v._id !== id));
+            if (fromQuick) setQuickModal(null);
         } catch (err: any) {
             toast.error(err.response?.data?.message || 'Failed to approve');
         } finally {
@@ -61,6 +123,22 @@ const VisitorNotificationsPage: React.FC = () => {
             setVisitors(prev => prev.filter(v => v._id !== rejectModal._id));
             setRejectModal(null);
             setRejectReason('');
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || 'Failed to reject');
+        } finally {
+            setActioningId(null);
+        }
+    };
+
+    // Quick-modal reject
+    const handleQuickReject = async (reason: string) => {
+        if (!quickModal) return;
+        setActioningId(quickModal._id);
+        try {
+            await api.put(`/admin/visitors/${quickModal._id}/reject`, { reason });
+            toast.success('❌ Visitor rejected');
+            setVisitors(prev => prev.filter(v => v._id !== quickModal._id));
+            setQuickModal(null);
         } catch (err: any) {
             toast.error(err.response?.data?.message || 'Failed to reject');
         } finally {
@@ -221,6 +299,169 @@ const VisitorNotificationsPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* ── Quick-action modal (opened by push notification click) ──── */}
+            {quickModal && (
+                <QuickActionModal
+                    visitor={quickModal}
+                    photo={quickPhotoUrl}
+                    actioningId={actioningId}
+                    onApprove={() => handleApprove(quickModal._id, true)}
+                    onReject={handleQuickReject}
+                    onClose={() => setQuickModal(null)}
+                />
+            )}
+        </div>
+    );
+};
+
+// ── Quick-action modal component ─────────────────────────────────────────────
+interface QuickActionModalProps {
+    visitor:    Visitor;
+    photo:      string | null;
+    actioningId: string | null;
+    onApprove:  () => void;
+    onReject:   (reason: string) => void;
+    onClose:    () => void;
+}
+
+const QuickActionModal: React.FC<QuickActionModalProps> = ({
+    visitor, photo, actioningId, onApprove, onReject, onClose,
+}) => {
+    const [showReject, setShowReject] = useState(false);
+    const [reason, setReason]         = useState('');
+    const busy = actioningId === visitor._id;
+
+    const timeLeft = (expiresAt: string) => {
+        const diff = new Date(expiresAt).getTime() - Date.now();
+        if (diff <= 0) return 'Expired';
+        const h = Math.floor(diff / 3_600_000);
+        const m = Math.floor((diff % 3_600_000) / 60_000);
+        return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
+    };
+
+    return (
+        <div style={overlayStyle} onClick={onClose}>
+            <div
+                style={{
+                    ...modalStyle,
+                    maxWidth: '460px',
+                    border: '1px solid rgba(249,115,22,0.4)',
+                    boxShadow: '0 25px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(249,115,22,0.2)',
+                }}
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Title */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{
+                            background: 'linear-gradient(135deg,#f59e0b,#ef4444)',
+                            borderRadius: '8px',
+                            padding: '4px 8px',
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            color: '#fff',
+                            letterSpacing: '0.05em',
+                        }}>
+                            ⚡ ACTION REQUIRED
+                        </span>
+                        <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '1rem' }}>Visitor Approval</h3>
+                    </div>
+                    <button onClick={onClose} style={grayCloseStyle}>✕</button>
+                </div>
+
+                {/* Photo + details */}
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'flex-start' }}>
+                    {photo ? (
+                        <img
+                            src={photo}
+                            alt="Visitor"
+                            style={{ width: '80px', height: '80px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(255,255,255,0.1)' }}
+                        />
+                    ) : (
+                        <div style={{
+                            width: '80px', height: '80px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', fontSize: '2rem', flexShrink: 0,
+                        }}>
+                            👤
+                        </div>
+                    )}
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#f1f5f9', marginBottom: '0.25rem' }}>
+                            {visitor.visitorName}
+                        </div>
+                        {visitor.visitorPhone && (
+                            <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>📞 {visitor.visitorPhone}</div>
+                        )}
+                        <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                            🏢 Wing {visitor.wing} · Flat {visitor.flatNo}
+                        </div>
+                        {visitor.purpose && (
+                            <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>📝 {visitor.purpose}</div>
+                        )}
+                        {visitor.vehicle?.regNo && (
+                            <div style={{ marginTop: '0.3rem' }}>
+                                <InfoChip icon="🚗" label={visitor.vehicle.regNo} color="#1d4ed8" />
+                            </div>
+                        )}
+                        <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.4rem', fontWeight: 600 }}>
+                            ⏳ {timeLeft(visitor.expiresAt)}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Action area */}
+                {!showReject ? (
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <button
+                            onClick={onApprove}
+                            disabled={busy}
+                            id={`quick-approve-${visitor._id}`}
+                            style={{ ...actionBtnStyle('#10b981', '#059669'), flex: 1, padding: '0.75rem', fontSize: '1rem' }}
+                        >
+                            {busy ? '⏳' : '✅'} Approve
+                        </button>
+                        <button
+                            onClick={() => setShowReject(true)}
+                            disabled={busy}
+                            id={`quick-reject-${visitor._id}`}
+                            style={{ ...actionBtnStyle('#ef4444', '#dc2626'), flex: 1, padding: '0.75rem', fontSize: '1rem' }}
+                        >
+                            ❌ Reject
+                        </button>
+                    </div>
+                ) : (
+                    <div>
+                        <p style={{ color: '#f1f5f9', margin: '0 0 0.5rem', fontSize: '0.9rem' }}>
+                            Reason for rejection <span style={{ color: '#64748b' }}>(optional)</span>
+                        </p>
+                        <textarea
+                            autoFocus
+                            placeholder="e.g. Resident not home, unknown person…"
+                            value={reason}
+                            onChange={e => setReason(e.target.value)}
+                            rows={2}
+                            style={{ ...inputStyle, resize: 'vertical' }}
+                        />
+                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
+                            <button
+                                className="btn btn--secondary"
+                                onClick={() => { setShowReject(false); setReason(''); }}
+                            >
+                                ← Back
+                            </button>
+                            <button
+                                onClick={() => onReject(reason)}
+                                disabled={busy}
+                                style={{ ...actionBtnStyle('#ef4444', '#dc2626'), flex: 1 }}
+                            >
+                                {busy ? '⏳' : '❌'} Confirm Reject
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

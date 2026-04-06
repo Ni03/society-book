@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,7 +8,11 @@ const LoginPage: React.FC = () => {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const { login, isAuthenticated, isMember } = useAuth();
-    const navigate = useNavigate();
+    const navigate  = useNavigate();
+    const location  = useLocation();
+
+    // Where to go after login: honour deep-link redirect, else dashboard
+    const from = (location.state as any)?.from?.pathname + ((location.state as any)?.from?.search ?? '') || '/admin/dashboard';
 
     // If already authenticated, redirect appropriately
     if (isAuthenticated) {
@@ -28,7 +32,7 @@ const LoginPage: React.FC = () => {
         try {
             await login(username.trim(), password);
             toast.success('Login successful!');
-            navigate('/admin/dashboard', { replace: true });
+            navigate(from, { replace: true });
         } catch (error: any) {
             const message = error.response?.data?.message || error.message || 'Login failed';
             toast.error(message);

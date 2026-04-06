@@ -4,13 +4,13 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 const MemberLoginPage: React.FC = () => {
-    const [flatNo,      setFlatNo]      = useState('');
+    const [flatNo, setFlatNo] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
-    const [loading,     setLoading]     = useState(false);
-    const [showPin,     setShowPin]     = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [showPin, setShowPin] = useState(false);
 
     // Field-level error state
-    const [flatError,  setFlatError]  = useState('');
+    const [flatError, setFlatError] = useState('');
     const [phoneError, setPhoneError] = useState('');
 
     const { memberLogin, isAuthenticated, isMember } = useAuth();

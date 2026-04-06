@@ -108,27 +108,6 @@ const MemberProfilePage: React.FC = () => {
 
     return (
         <div className="app-layout">
-            {/* Navbar */}
-            <nav className="navbar">
-                <div className="navbar__inner">
-                    <div className="navbar__brand">
-                        <div className="navbar__logo">SB</div>
-                        <div>
-                            <div className="navbar__title">Society Book</div>
-                            <div className="navbar__subtitle">👤 Member Portal</div>
-                        </div>
-                    </div>
-                    <div className="navbar__actions">
-                        <div className="navbar__wing-badge">
-                            <span>🏢</span>
-                            <span>Wing {member.wing} · {member.flatNo}</span>
-                        </div>
-                        <button className="btn btn--ghost btn--sm" onClick={handleLogout} id="member-logout-btn">
-                            Logout
-                        </button>
-                    </div>
-                </div>
-            </nav>
 
             <div style={{ padding: '2rem 1rem', maxWidth: '720px', margin: '0 auto' }}>
                 {/* Welcome banner */}

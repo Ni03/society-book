@@ -102,31 +102,6 @@ const AdminLayout: React.FC = () => {
                                 <span>🔍</span> Vehicle Search
                             </NavLink>
 
-                            {/* Notifications — with badge */}
-                            <NavLink
-                                to="/admin/visitors/notifications"
-                                className={({ isActive }) =>
-                                    `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
-                                }
-                                id="nav-visitor-notifs"
-                                style={{ position: 'relative' }}
-                            >
-                                <span>🔔</span> Visitor Alerts
-                                {pendingCount > 0 && (
-                                    <span style={{
-                                        position: 'absolute', top: '6px', right: '10px',
-                                        background: '#ef4444', color: '#fff',
-                                        fontSize: '0.65rem', fontWeight: 800,
-                                        borderRadius: '10px', padding: '1px 6px',
-                                        minWidth: '18px', textAlign: 'center',
-                                        lineHeight: '16px',
-                                        boxShadow: '0 0 8px rgba(239,68,68,0.6)',
-                                        animation: 'pulse 1.5s infinite',
-                                    }}>
-                                        {pendingCount}
-                                    </span>
-                                )}
-                            </NavLink>
 
                             <NavLink
                                 to="/admin/visitors/history"

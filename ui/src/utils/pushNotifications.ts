@@ -1,20 +1,19 @@
 /**
- * usePushNotifications.ts
+ * pushNotifications.ts
  *
- * Registers the Service Worker and subscribes the current admin to Web Push.
+ * Registers the Service Worker and subscribes the current user to Web Push.
  *
- * iOS 16.4+ requires the page to be installed as a PWA ("Add to Home Screen").
- * Android Chrome works in the browser directly.
+ * - Admins/Chairmen  → /api/push/subscribe
+ * - Members/Residents → /api/member/push/subscribe
  *
- * Call subscribe() after login and unsubscribe() on logout.
+ * Call subscribePush(role) after login, unsubscribePush(role) on logout.
  */
 
 import api from '../api/axios';
 
-/** Convert the base64url VAPID public key string → Uint8Array */
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
     const rawData = atob(base64);
     return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
@@ -34,7 +33,8 @@ async function getSwRegistration(): Promise<ServiceWorkerRegistration | null> {
     }
 }
 
-export async function subscribePush(): Promise<void> {
+/** role = 'member' → uses member push route; anything else → admin push route */
+export async function subscribePush(role?: string): Promise<void> {
     try {
         if (!('PushManager' in window)) {
             console.info('Push not supported in this browser.');
@@ -50,13 +50,16 @@ export async function subscribePush(): Promise<void> {
         const swReg = await getSwRegistration();
         if (!swReg) return;
 
-        // Fetch VAPID public key from server (no auth needed)
-        const { data } = await api.get<{ success: boolean; publicKey: string }>('/push/vapid-public-key');
+        // Fetch VAPID public key — use member endpoint if role is 'member'
+        const vapidRoute = role === 'member'
+            ? '/member/push/vapid-public-key'
+            : '/push/vapid-public-key';
+
+        const { data } = await api.get<{ success: boolean; publicKey: string }>(vapidRoute);
         if (!data.success || !data.publicKey) return;
 
         const applicationServerKey = urlBase64ToUint8Array(data.publicKey);
 
-        // Check if already subscribed
         let subscription = await swReg.pushManager.getSubscription();
         if (!subscription) {
             subscription = await swReg.pushManager.subscribe({
@@ -65,15 +68,19 @@ export async function subscribePush(): Promise<void> {
             });
         }
 
-        // Send subscription to backend
-        await api.post('/push/subscribe', subscription.toJSON());
-        console.info('✅ Push notifications subscribed.');
+        // Persist subscription on the backend
+        const subscribeRoute = role === 'member'
+            ? '/member/push/subscribe'
+            : '/push/subscribe';
+
+        await api.post(subscribeRoute, subscription.toJSON());
+        console.info(`✅ Push subscribed (${role ?? 'admin'}).`);
     } catch (err) {
         console.error('subscribePush error:', err);
     }
 }
 
-export async function unsubscribePush(): Promise<void> {
+export async function unsubscribePush(role?: string): Promise<void> {
     try {
         const swReg = await getSwRegistration();
         if (!swReg) return;
@@ -81,9 +88,11 @@ export async function unsubscribePush(): Promise<void> {
         const subscription = await swReg.pushManager.getSubscription();
         if (!subscription) return;
 
-        // Tell server to remove this subscription
-        await api.post('/push/unsubscribe', { endpoint: subscription.endpoint }).catch(() => {});
+        const unsubscribeRoute = role === 'member'
+            ? '/member/push/unsubscribe'
+            : '/push/unsubscribe';
 
+        await api.post(unsubscribeRoute, { endpoint: subscription.endpoint }).catch(() => {});
         await subscription.unsubscribe();
         _swRegistration = null;
         console.info('Push notifications unsubscribed.');

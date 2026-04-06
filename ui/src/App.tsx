@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
+import MemberLayout from './components/MemberLayout';
 import PublicFormPage from './pages/PublicFormPage';
 import LoginPage from './pages/LoginPage';
 import MemberLoginPage from './pages/MemberLoginPage';
@@ -15,6 +16,8 @@ import SecurityPage from './pages/SecurityPage';
 import VisitorNotificationsPage from './pages/VisitorNotificationsPage';
 import VisitorHistoryPage from './pages/VisitorHistoryPage';
 import MemberProfilePage from './pages/MemberProfilePage';
+import MemberVisitorsPage from './pages/MemberVisitorsPage';
+import MemberVisitorHistoryPage from './pages/MemberVisitorHistoryPage';
 
 /** Smart root redirect based on role */
 const RootRedirect: React.FC = () => {
@@ -58,13 +61,17 @@ const App: React.FC = () => {
 
                     {/* ── Member Portal ────────────────────────── */}
                     <Route
-                        path="/member/profile"
+                        path="/member"
                         element={
                             <ProtectedRoute requiredRole="member">
-                                <MemberProfilePage />
+                                <MemberLayout />
                             </ProtectedRoute>
                         }
-                    />
+                    >
+                        <Route path="profile"           element={<MemberProfilePage />} />
+                        <Route path="visitors"           element={<MemberVisitorsPage />} />
+                        <Route path="visitors/history"  element={<MemberVisitorHistoryPage />} />
+                    </Route>
 
                     {/* ── Protected Admin Routes ───────────────── */}
                     <Route

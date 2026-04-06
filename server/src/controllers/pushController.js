@@ -1,11 +1,10 @@
 'use strict';
 
 const webPush = require('web-push');
-const PushSubscription = require('../models/PushSubscription');
+const PushSubscription       = require('../models/PushSubscription');
+const MemberPushSubscription = require('../models/MemberPushSubscription');
 
 // ── Lazy VAPID initialisation ─────────────────────────────────────────────────
-// Called only when a push is about to be sent, not at module-load time.
-// This prevents server crashes when env vars aren't set yet (e.g. cold Render deploy).
 let _vapidReady = false;
 const initVapid = () => {
     if (_vapidReady) return true;
@@ -16,9 +15,7 @@ const initVapid = () => {
 
     if (!publicKey || !privateKey) {
         console.error(
-            '[push] VAPID keys not found in environment. ' +
-            'Add VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT in the Render dashboard ' +
-            '(or your .env file locally).'
+            '[push] VAPID keys not found. Add VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.'
         );
         return false;
     }
@@ -32,8 +29,45 @@ const initVapid = () => {
     return true;
 };
 
+// ── Shared helper: send to a list of subscriptions ───────────────────────────
+const sendToSubscriptions = async (subscriptions, pushPayload) => {
+    await Promise.allSettled(
+        subscriptions.map(async (sub) => {
+            try {
+                await webPush.sendNotification(
+                    {
+                        endpoint:       sub.endpoint,
+                        expirationTime: sub.expirationTime,
+                        keys:           sub.keys,
+                    },
+                    pushPayload
+                );
+            } catch (err) {
+                // 410/404 = expired — remove stale subscription
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                    const Model = sub.adminId ? PushSubscription : MemberPushSubscription;
+                    await Model.deleteOne({ _id: sub._id });
+                } else {
+                    console.error(`Push failed for sub ${sub._id}:`, err.message);
+                }
+            }
+        })
+    );
+};
+
+const buildPayload = (payload) =>
+    JSON.stringify({
+        title:              payload.title              ?? 'Society Book',
+        body:               payload.body               ?? '',
+        icon:               '/vite.svg',
+        badge:              '/vite.svg',
+        tag:                payload.tag                ?? 'visitor-update',
+        url:                payload.url                ?? '/',
+        visitorId:          payload.visitorId          ?? null,
+        requireInteraction: payload.requireInteraction ?? false,
+    });
+
 // ── GET /api/push/vapid-public-key ────────────────────────────────────────────
-// Returns the VAPID public key so the browser can subscribe
 const getVapidPublicKey = (req, res) => {
     const key = process.env.VAPID_PUBLIC_KEY;
     if (!key) {
@@ -42,8 +76,7 @@ const getVapidPublicKey = (req, res) => {
     res.json({ success: true, publicKey: key });
 };
 
-// ── POST /api/push/subscribe ───────────────────────────────────────────────────
-// Saves (or updates) a push subscription for the logged-in admin
+// ── POST /api/push/subscribe  (admin) ─────────────────────────────────────────
 const subscribe = async (req, res) => {
     try {
         const { adminId, wing } = req.admin;
@@ -53,7 +86,6 @@ const subscribe = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid subscription object.' });
         }
 
-        // Upsert: same admin + same endpoint = update keys
         await PushSubscription.findOneAndUpdate(
             { adminId, endpoint },
             { adminId, wing, endpoint, expirationTime: expirationTime ?? null, keys },
@@ -67,7 +99,7 @@ const subscribe = async (req, res) => {
     }
 };
 
-// ── POST /api/push/unsubscribe ────────────────────────────────────────────────
+// ── POST /api/push/unsubscribe  (admin) ───────────────────────────────────────
 const unsubscribe = async (req, res) => {
     try {
         const { adminId } = req.admin;
@@ -80,59 +112,77 @@ const unsubscribe = async (req, res) => {
     }
 };
 
-/**
- * sendPushToWing(wing, payload)
- *
- * Sends a push notification to all subscribed admins for a given wing
- * (plus all superadmins whose wing === 'ALL').
- *
- * payload = { title, body, url, tag, requireInteraction }
- */
+// ── POST /api/member/push/subscribe  (member) ─────────────────────────────────
+const subscribeMember = async (req, res) => {
+    try {
+        const { memberId, wing, flatNo } = req.member;
+        const { endpoint, expirationTime, keys } = req.body;
+
+        if (!endpoint || !keys?.p256dh || !keys?.auth) {
+            return res.status(400).json({ success: false, message: 'Invalid subscription object.' });
+        }
+
+        await MemberPushSubscription.findOneAndUpdate(
+            { memberId, endpoint },
+            { memberId, wing, flatNo, endpoint, expirationTime: expirationTime ?? null, keys },
+            { upsert: true, new: true }
+        );
+
+        res.json({ success: true, message: 'Member push subscription saved.' });
+    } catch (error) {
+        console.error('Member push subscribe error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+// ── POST /api/member/push/unsubscribe  (member) ───────────────────────────────
+const unsubscribeMember = async (req, res) => {
+    try {
+        const { memberId } = req.member;
+        const { endpoint } = req.body;
+        await MemberPushSubscription.deleteOne({ memberId, endpoint });
+        res.json({ success: true, message: 'Unsubscribed.' });
+    } catch (error) {
+        console.error('Member push unsubscribe error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+// ── sendPushToWing(wing, payload) — sends to all admins in that wing ──────────
 const sendPushToWing = async (wing, payload) => {
     if (!initVapid()) return;
     try {
-        // Find subscriptions for the target wing AND superadmins (wing 'ALL')
         const subscriptions = await PushSubscription.find({
             wing: { $in: [wing, 'ALL'] },
         });
-
         if (subscriptions.length === 0) return;
-
-        const pushPayload = JSON.stringify({
-            title:              payload.title              ?? 'Society Book',
-            body:               payload.body               ?? '',
-            icon:               '/vite.svg',
-            badge:              '/vite.svg',
-            tag:                payload.tag                ?? 'visitor-update',
-            url:                payload.url                ?? '/',
-            requireInteraction: payload.requireInteraction ?? false,
-        });
-
-        await Promise.allSettled(
-            subscriptions.map(async (sub) => {
-                try {
-                    await webPush.sendNotification(
-                        {
-                            endpoint:       sub.endpoint,
-                            expirationTime: sub.expirationTime,
-                            keys:           sub.keys,
-                        },
-                        pushPayload
-                    );
-                } catch (err) {
-                    // 410 Gone = subscription expired/revoked — remove it
-                    if (err.statusCode === 410 || err.statusCode === 404) {
-                        await PushSubscription.deleteOne({ _id: sub._id });
-                        console.log(`Removed stale push subscription for admin ${sub.adminId}`);
-                    } else {
-                        console.error(`Push send failed for sub ${sub._id}:`, err.message);
-                    }
-                }
-            })
-        );
+        await sendToSubscriptions(subscriptions, buildPayload(payload));
     } catch (error) {
         console.error('sendPushToWing error:', error);
     }
 };
 
-module.exports = { getVapidPublicKey, subscribe, unsubscribe, sendPushToWing };
+// ── sendPushToFlat(wing, flatNo, payload) — sends to the resident of that flat ─
+const sendPushToFlat = async (wing, flatNo, payload) => {
+    if (!initVapid()) return;
+    try {
+        const subscriptions = await MemberPushSubscription.find({
+            wing:   wing.toUpperCase(),
+            flatNo: { $regex: new RegExp(`^${flatNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        });
+        if (subscriptions.length === 0) return;
+        await sendToSubscriptions(subscriptions, buildPayload(payload));
+    } catch (error) {
+        console.error('sendPushToFlat error:', error);
+    }
+};
+
+module.exports = {
+    getVapidPublicKey,
+    subscribe,
+    unsubscribe,
+    subscribeMember,
+    unsubscribeMember,
+    sendPushToWing,
+    sendPushToFlat,
+};
