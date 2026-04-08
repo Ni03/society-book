@@ -19,13 +19,25 @@ import MemberProfilePage from './pages/MemberProfilePage';
 import MemberVisitorsPage from './pages/MemberVisitorsPage';
 import MemberVisitorHistoryPage from './pages/MemberVisitorHistoryPage';
 
-/** Smart root redirect based on role */
+/**
+ * Smart root redirect based on auth state.
+ *
+ * iOS PWA fix: When a member adds the app to their home screen from
+ * /member-login, iOS saves that URL. On subsequent launches without an
+ * active session the router lands here at "/" and we need to send them
+ * back to /member-login — not the admin /login page.
+ *
+ * We persist the user's preferred login route in localStorage so the
+ * redirect is correct regardless of which URL iOS cached.
+ */
 const RootRedirect: React.FC = () => {
     const { isAuthenticated, isMember } = useAuth();
     if (isAuthenticated) {
         return <Navigate to={isMember ? '/member/profile' : '/admin/dashboard'} replace />;
     }
-    return <Navigate to="/login" replace />;
+    // Read stored preference (set by MemberLoginPage / LoginPage on mount)
+    const preferred = localStorage.getItem('preferredLogin');
+    return <Navigate to={preferred === 'member' ? '/member-login' : '/login'} replace />;
 };
 
 const App: React.FC = () => {
@@ -45,17 +57,28 @@ const App: React.FC = () => {
                             fontFamily: "'Inter', sans-serif",
                         },
                         success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
-                        error:   { iconTheme: { primary: '#f43f5e', secondary: '#fff' } },
+                        error: { iconTheme: { primary: '#f43f5e', secondary: '#fff' } },
                     }}
                 />
 
                 <Routes>
+                    {/* ── Fallback ──────────────────────────────── */}
+                    <Route path="/" element={<RootRedirect />} />
+                    {/* Catch-all: honour preferred login route stored by PWA shortcut */}
+                    <Route
+                        path="*"
+                        element={<Navigate
+                            to={localStorage.getItem('preferredLogin') === 'member' ? '/member-login' : '/login'}
+                            replace
+                        />}
+                    />
+
                     {/* ── Public form (member self-registration) ── */}
                     <Route path="/public/:wing/:type" element={<PublicFormPage />} />
 
                     {/* ── Auth Routes ─────────────────────────── */}
                     {/* Admin / Chairman / Security login */}
-                    <Route path="/login"        element={<LoginPage />} />
+                    <Route path="/login" element={<LoginPage />} />
                     {/* Resident / Member login */}
                     <Route path="/member-login" element={<MemberLoginPage />} />
 
@@ -68,9 +91,9 @@ const App: React.FC = () => {
                             </ProtectedRoute>
                         }
                     >
-                        <Route path="profile"           element={<MemberProfilePage />} />
-                        <Route path="visitors"           element={<MemberVisitorsPage />} />
-                        <Route path="visitors/history"  element={<MemberVisitorHistoryPage />} />
+                        <Route path="profile" element={<MemberProfilePage />} />
+                        <Route path="visitors" element={<MemberVisitorsPage />} />
+                        <Route path="visitors/history" element={<MemberVisitorHistoryPage />} />
                     </Route>
 
                     {/* ── Protected Admin Routes ───────────────── */}
@@ -83,18 +106,14 @@ const App: React.FC = () => {
                         }
                     >
                         <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                        <Route path="dashboard"              element={<DashboardPage />} />
-                        <Route path="members"                element={<MembersPage />} />
-                        <Route path="members/:id/edit"       element={<EditMemberPage />} />
-                        <Route path="search"                 element={<VehicleSearchPage />} />
-                        <Route path="security"               element={<SecurityPage />} />
+                        <Route path="dashboard" element={<DashboardPage />} />
+                        <Route path="members" element={<MembersPage />} />
+                        <Route path="members/:id/edit" element={<EditMemberPage />} />
+                        <Route path="search" element={<VehicleSearchPage />} />
+                        <Route path="security" element={<SecurityPage />} />
                         <Route path="visitors/notifications" element={<VisitorNotificationsPage />} />
-                        <Route path="visitors/history"       element={<VisitorHistoryPage />} />
+                        <Route path="visitors/history" element={<VisitorHistoryPage />} />
                     </Route>
-
-                    {/* ── Fallback ──────────────────────────────── */}
-                    <Route path="/" element={<RootRedirect />} />
-                    <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
             </BrowserRouter>
         </AuthProvider>
