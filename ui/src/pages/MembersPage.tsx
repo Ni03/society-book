@@ -74,6 +74,37 @@ const MembersPage: React.FC = () => {
         }
     };
 
+    const handleExportAttachments = async () => {
+        try {
+            const params: Record<string, string> = {};
+            if (filter !== 'all') params.type = filter;
+            if (search.trim()) params.search = search.trim();
+
+            toast.loading('Preparing ZIP archive...', { id: 'zip-toast' });
+
+            const response = await api.get('/admin/members/export-attachments', {
+                params,
+                responseType: 'blob',
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+
+            const disposition = response.headers['content-disposition'] as string | undefined;
+            const match = disposition?.match(/filename="(.+?)"/);
+            link.download = match ? match[1] : `Attachments_${new Date().toISOString().slice(0, 10)}.zip`;
+
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            toast.success('Attachments fully downloaded!', { id: 'zip-toast' });
+        } catch (error) {
+            toast.error('Failed to export attachments', { id: 'zip-toast' });
+        }
+    };
+
     const handleDelete = async () => {
         if (!confirmDelete) return;
         setDeleting(true);
@@ -156,25 +187,25 @@ const MembersPage: React.FC = () => {
                                     id="search-name-input"
                                 />
                             </div>
-                            <button type="submit" className="btn btn--primary btn--sm" id="search-name-btn">
+                            <button type="submit" className="btn btn--primary" id="search-name-btn">
                                 Search
                             </button>
                         </form>
                         <button
-                            className="btn btn--success btn--sm"
+                            className="btn btn--info"
+                            onClick={handleExportAttachments}
+                            id="export-attachments-btn"
+                            title={`Download all attachments as ZIP${filter !== 'all' ? ` (${filter}s only)` : ''}`}
+                            style={{ whiteSpace: 'nowrap' }}
+                        >
+                            🗂️ Download Attachments
+                        </button>
+                        <button
+                            className="btn btn--success"
                             onClick={handleExport}
                             id="export-excel-btn"
                             title={`Export current view as Excel${filter !== 'all' ? ` (${filter}s only)` : ''}`}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                whiteSpace: 'nowrap',
-                                background: 'linear-gradient(135deg, #059669, #047857)',
-                                color: '#fff',
-                                border: 'none',
-                                boxShadow: '0 2px 6px rgba(5,150,105,0.35)',
-                            }}
+                            style={{ whiteSpace: 'nowrap' }}
                         >
                             📥 Export Excel
                         </button>
@@ -326,15 +357,9 @@ const MembersPage: React.FC = () => {
                                                     ✏️ Edit
                                                 </button>
                                                 <button
-                                                    className="btn btn--sm"
+                                                    className="btn btn--danger btn--sm"
                                                     onClick={() => setConfirmDelete(member)}
                                                     id={`delete-member-${member._id}`}
-                                                    style={{
-                                                        background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
-                                                        color: '#fff',
-                                                        border: 'none',
-                                                        boxShadow: '0 2px 6px rgba(220,38,38,0.3)',
-                                                    }}
                                                 >
                                                     🗑️ Delete
                                                 </button>
@@ -394,17 +419,11 @@ const MembersPage: React.FC = () => {
                                 Cancel
                             </button>
                             <button
-                                className="btn"
+                                className="btn btn--danger"
                                 onClick={handleDelete}
                                 disabled={deleting}
                                 id="confirm-delete-btn"
-                                style={{
-                                    background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    minWidth: '120px',
-                                    boxShadow: '0 4px 12px rgba(220,38,38,0.4)',
-                                }}
+                                style={{ minWidth: '120px' }}
                             >
                                 {deleting ? (
                                     <><span className="spinner" /> Deleting...</>

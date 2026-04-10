@@ -321,14 +321,49 @@ input, select, textarea {
   transform: translateY(-1px);
 }
 
-.btn--danger {
-  background: var(--danger-500);
+.btn--success {
+  background: var(--gradient-accent); /* Emerald to Cyan */
   color: white;
+  box-shadow: var(--shadow-md), var(--shadow-glow-accent);
+}
+
+.btn--success:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(16, 185, 129, 0.4);
+}
+
+.btn--success:active {
+  transform: translateY(0);
+}
+
+.btn--info {
+  background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+  color: white;
+  box-shadow: var(--shadow-md), 0 0 20px rgba(14, 165, 233, 0.3);
+}
+
+.btn--info:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(14, 165, 233, 0.4);
+}
+
+.btn--info:active {
+  transform: translateY(0);
+}
+
+.btn--danger {
+  background: linear-gradient(135deg, var(--danger-500), var(--danger-600));
+  color: white;
+  box-shadow: var(--shadow-md), 0 0 20px rgba(244, 63, 94, 0.3);
 }
 
 .btn--danger:hover {
-  background: var(--danger-600);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(244, 63, 94, 0.4);
+}
+
+.btn--danger:active {
+  transform: translateY(0);
 }
 
 .btn--ghost {

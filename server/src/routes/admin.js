@@ -8,6 +8,7 @@ const {
     deleteMember,
     searchByRegistration,
     exportMembersExcel,
+    exportAttachments,
 } = require('../controllers/adminController');
 const {
     getNotifications,
@@ -30,6 +31,9 @@ router.get('/members', getMembers);
 
 // GET /api/admin/members/export?type=owner&search=...
 router.get('/members/export', exportMembersExcel);
+
+// GET /api/admin/members/export-attachments
+router.get('/members/export-attachments', exportAttachments);
 
 // GET /api/admin/members/:id
 router.get('/members/:id', getMemberById);

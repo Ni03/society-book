@@ -1,6 +1,7 @@
 const Member = require('../models/Member');
 const Visitor = require('../models/Visitor');
 const ExcelJS = require('exceljs');
+const archiver = require('archiver');
 const fs = require('fs');
 const path = require('path');
 
@@ -575,6 +576,69 @@ const exportMembersExcel = async (req, res) => {
     }
 };
 
+// GET /api/admin/members/export-attachments - Export attachments as .zip
+const exportAttachments = async (req, res) => {
+    try {
+        const { wing, role } = req.admin;
+        const { type, search } = req.query;
+
+        const isSuperAdmin = role === 'superadmin' || wing === 'ALL';
+
+        const filter = {};
+        if (!isSuperAdmin) filter.wing = wing;
+        if (type && ['owner', 'tenant'].includes(type.toLowerCase())) {
+            filter.type = type.toLowerCase();
+        }
+        if (search) {
+            filter.fullName = { $regex: search, $options: 'i' };
+        }
+
+        const members = await Member.find(filter);
+
+        const exportLabel = isSuperAdmin ? 'AllWings' : `Wing_${wing.replace(/[^A-Za-z0-9]/g, '_')}`;
+        const filename = `${exportLabel}_Attachments_${new Date().toISOString().slice(0, 10)}.zip`;
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        archive.on('error', function(err) {
+            console.error('Archive Error:', err);
+            if (!res.headersSent) res.status(500).end();
+        });
+
+        archive.pipe(res);
+
+        let filesAdded = 0;
+        members.forEach(m => {
+            const attachmentPath = m.type === 'owner' ? m.ownerDetails?.index2 : m.tenantDetails?.agreement;
+            if (attachmentPath) {
+                const cleanAppPath = attachmentPath.startsWith('/') ? attachmentPath.slice(1) : attachmentPath;
+                const fullPath = path.join(__dirname, '../../', cleanAppPath);
+                
+                if (fs.existsSync(fullPath)) {
+                    const name = path.basename(fullPath);
+                    const folder = `${m.wing}-${m.flatNo}`;
+                    archive.file(fullPath, { name: `${folder}/${name}` });
+                    filesAdded++;
+                }
+            }
+        });
+
+        if (filesAdded === 0) {
+            archive.append('No attachments found for the selected members.', { name: 'empty.txt' });
+        }
+
+        await archive.finalize();
+    } catch (error) {
+        console.error('Export Attachments Error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'Failed to generate attachments export.' });
+        }
+    }
+};
+
 module.exports = {
     getMembers,
     getMemberById,
@@ -582,5 +646,6 @@ module.exports = {
     deleteMember,
     searchByRegistration,
     exportMembersExcel,
+    exportAttachments,
 };
 
