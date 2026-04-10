@@ -135,7 +135,7 @@ const updateMemberProfile = async (req, res) => {
             try { tenantDetails = JSON.parse(tenantDetails); } catch (e) { tenantDetails = undefined; }
         }
 
-        const allowedUpdates = ['phoneNumber', 'flatNo', 'vehicles'];
+        const allowedUpdates = ['phoneNumber', 'flatNo', 'email', 'caste', 'vehicles'];
         const updateData = {};
 
         for (const key of allowedUpdates) {

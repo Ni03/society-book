@@ -41,6 +41,18 @@ const memberSchema = new mongoose.Schema(
                 message: 'Phone number must be exactly 10 digits',
             },
         },
+        email: {
+            type: String,
+            trim: true,
+            lowercase: true,
+            default: null,
+            match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'],
+        },
+        caste: {
+            type: String,
+            trim: true,
+            default: null,
+        },
         flatNo: {
             type: String,
             required: [true, 'Flat number is required'],

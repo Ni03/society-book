@@ -137,10 +137,11 @@ const updateMember = async (req, res) => {
             });
         }
 
-        // Fields that can be updated
         const allowedUpdates = [
             'phoneNumber',
             'flatNo',
+            'email',
+            'caste',
             'vehicles',
             'ownerDetails',
             'tenantDetails',

@@ -11,6 +11,8 @@ const createMember = async (req, res) => {
             flatNo,
             wing,
             type,
+            email,
+            caste,
         } = req.body;
 
         // Parse JSON strings from FormData if they are strings
@@ -127,6 +129,8 @@ const createMember = async (req, res) => {
             flatNo: flatNo.trim(),
             wing: wing.toUpperCase(),
             type: type.toLowerCase(),
+            email: email ? email.trim() : null,
+            caste: caste ? caste.trim() : null,
             vehicles: {
                 bikes: {
                     count: vehicles?.bikes?.count || 0,
