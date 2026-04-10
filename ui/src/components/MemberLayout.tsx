@@ -14,7 +14,7 @@ export interface MemberLayoutContext {
 
 const MemberLayout: React.FC = () => {
     const enableBetaFeatures = import.meta.env.VITE_ENABLE_BETA_FEATURES !== 'false';
-    const { wing, logout } = useAuth();
+    const { wing, fullName, flatNo, memberType, logout } = useAuth();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [pendingCount, setPendingCount] = useState(0);
@@ -175,13 +175,13 @@ const MemberLayout: React.FC = () => {
                         <div className="navbar__logo">SB</div>
                         <div>
                             <div className="navbar__title">Society Book</div>
-                            <div className="navbar__subtitle">👤 Member Portal</div>
+                            <div className="navbar__subtitle">Wing {wing} · Flat {flatNo}</div>
                         </div>
                     </div>
                     <div className="navbar__actions">
-                        <div className="navbar__wing-badge">
-                            <span>🏢</span>
-                            <span>Wing {wing}</span>
+                        <div className="navbar__wing-badge" style={{ background: 'var(--primary-100, #e0e7ff)', color: 'var(--primary-800, #3730a3)' }}>
+                            <span>👤</span>
+                            <span>{fullName?.split(' ')[0] || 'Member'}</span>
                         </div>
                         <button
                             className="btn btn--ghost btn--sm"

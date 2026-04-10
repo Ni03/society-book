@@ -94,6 +94,7 @@ const memberLogin = async (req, res) => {
             wing: member.wing,
             flatNo: member.flatNo,
             fullName: member.fullName,
+            type: member.type,
             role: 'member',
         });
     } catch (error) {

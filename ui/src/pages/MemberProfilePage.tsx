@@ -110,30 +110,6 @@ const MemberProfilePage: React.FC = () => {
         <div className="app-layout">
 
             <div style={{ padding: '2rem 1rem', maxWidth: '720px', margin: '0 auto' }}>
-                {/* Welcome banner */}
-                <div style={{
-                    background: 'linear-gradient(135deg, var(--primary-600), var(--primary-800, #1e40af))',
-                    borderRadius: 'var(--border-radius-lg)', padding: '1.5rem 1.75rem',
-                    marginBottom: '1.75rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '1rem',
-                }}>
-                    <div style={{
-                        width: '52px', height: '52px', borderRadius: '50%',
-                        background: 'rgba(255,255,255,0.2)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '1.5rem', flexShrink: 0,
-                    }}>
-                        {member.type === 'owner' ? '🏠' : '📋'}
-                    </div>
-                    <div>
-                        <div style={{ fontWeight: 700, fontSize: '1.15rem' }}>
-                            Welcome, {authFullName || member.fullName}
-                        </div>
-                        <div style={{ opacity: 0.85, fontSize: '0.9rem', marginTop: '0.2rem' }}>
-                            Wing {member.wing} · Flat {member.flatNo} · {member.type === 'owner' ? 'Owner' : 'Tenant'}
-                        </div>
-                    </div>
-                </div>
-
                 {/* Notice */}
                 <div style={{
                     background: 'var(--warning-50, #fffbeb)', border: '1px solid var(--warning-200, #fde68a)',
@@ -141,7 +117,9 @@ const MemberProfilePage: React.FC = () => {
                     marginBottom: '1.5rem', fontSize: '0.85rem', color: 'var(--warning-700, #92400e)',
                 }}>
                     ℹ️ You can update your <strong>vehicle details</strong> and your{' '}
-                    <strong>{attachmentLabel}</strong>. Other fields are managed by your wing chairman.
+                    <strong>{attachmentLabel}</strong>.
+                    <br />
+                    &nbsp;&nbsp;&nbsp;&nbsp; Name, Phone No and Flat No fields are managed by your wing chairman.
                 </div>
 
                 <div className="card card--elevated">

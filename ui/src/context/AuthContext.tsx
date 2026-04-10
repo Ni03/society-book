@@ -9,6 +9,7 @@ interface AuthContextType {
     role:            string | null;
     memberId:        string | null;
     fullName:        string | null;
+    memberType:      string | null;
     isAuthenticated: boolean;
     isMember:        boolean;
     login:       (username: string, password: string) => Promise<void>;
@@ -31,8 +32,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [wing,     setWing]     = useState<string | null>(localStorage.getItem('wing'));
     const [flatNo,   setFlatNo]   = useState<string | null>(localStorage.getItem('flatNo'));
     const [role,     setRole]     = useState<string | null>(localStorage.getItem('role'));
-    const [memberId, setMemberId] = useState<string | null>(localStorage.getItem('memberId'));
-    const [fullName, setFullName] = useState<string | null>(localStorage.getItem('fullName'));
+    const [memberId,   setMemberId]   = useState<string | null>(localStorage.getItem('memberId'));
+    const [fullName,   setFullName]   = useState<string | null>(localStorage.getItem('fullName'));
+    const [memberType, setMemberType] = useState<string | null>(localStorage.getItem('memberType'));
 
     const isAuthenticated = !!token;
     const isMember        = role === 'member';
@@ -42,10 +44,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (token)    localStorage.setItem('token',    token);    else localStorage.removeItem('token');
         if (wing)     localStorage.setItem('wing',     wing);     else localStorage.removeItem('wing');
         if (flatNo)   localStorage.setItem('flatNo',   flatNo);   else localStorage.removeItem('flatNo');
-        if (role)     localStorage.setItem('role',     role);     else localStorage.removeItem('role');
-        if (memberId) localStorage.setItem('memberId', memberId); else localStorage.removeItem('memberId');
-        if (fullName) localStorage.setItem('fullName', fullName); else localStorage.removeItem('fullName');
-    }, [token, wing, flatNo, role, memberId, fullName]);
+        if (role)       localStorage.setItem('role',       role);       else localStorage.removeItem('role');
+        if (memberId)   localStorage.setItem('memberId',   memberId);   else localStorage.removeItem('memberId');
+        if (fullName)   localStorage.setItem('fullName',   fullName);   else localStorage.removeItem('fullName');
+        if (memberType) localStorage.setItem('memberType', memberType); else localStorage.removeItem('memberType');
+    }, [token, wing, flatNo, role, memberId, fullName, memberType]);
 
     // ── Admin / Chairman login ─────────────────────────────────────────────────
     const login = async (username: string, password: string): Promise<void> => {
@@ -56,6 +59,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setRole(response.data.role || 'chairman');
             setMemberId(null);
             setFullName(null);
+            setMemberType(null);
             // Subscribe using the admin push route
             setTimeout(() => subscribePush('admin').catch(console.error), 300);
         } else {
@@ -73,6 +77,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setRole('member');
             setMemberId(response.data.memberId);
             setFullName(response.data.fullName);
+            setMemberType(response.data.type || null);
             // Subscribe using the member push route (so they receive visitor alerts)
             setTimeout(() => subscribePush('member').catch(console.error), 300);
         } else {
@@ -90,17 +95,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setRole(null);
         setMemberId(null);
         setFullName(null);
+        setMemberType(null);
         localStorage.removeItem('token');
         localStorage.removeItem('wing');
         localStorage.removeItem('flatNo');
         localStorage.removeItem('role');
         localStorage.removeItem('memberId');
         localStorage.removeItem('fullName');
+        localStorage.removeItem('memberType');
     };
 
     return (
         <AuthContext.Provider value={{
-            token, wing, flatNo, role, memberId, fullName,
+            token, wing, flatNo, role, memberId, fullName, memberType,
             isAuthenticated, isMember,
             login, memberLogin, logout,
         }}>

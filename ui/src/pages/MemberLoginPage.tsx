@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 const MemberLoginPage: React.FC = () => {
+    const enableBetaFeatures = import.meta.env.VITE_ENABLE_BETA_FEATURES !== 'false';
     const [flatNo, setFlatNo] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [loading, setLoading] = useState(false);
@@ -217,21 +218,22 @@ const MemberLoginPage: React.FC = () => {
                         </button>
 
                         {/* Link to Admin login */}
-                        <div style={{
-                            textAlign: 'center',
-                            marginTop: '1.5rem',
-                            marginBottom: '1rem',
-                            fontSize: '0.85rem',
-                            color: 'var(--text-muted, #94a3b8)'
-                        }}>
-                            Are you an admin?{' '}
-                            <a href="/login" onClick={(e) => {
-                                e.preventDefault();
-                                navigate('/login');
-                            }} style={{ color: 'var(--primary-400, #818cf8)', fontWeight: 500, textDecoration: 'none' }}>
-                                Admin Login
-                            </a>
-                        </div>
+                        {enableBetaFeatures &&
+                            <div style={{
+                                textAlign: 'center',
+                                marginTop: '1.5rem',
+                                marginBottom: '1rem',
+                                fontSize: '0.85rem',
+                                color: 'var(--text-muted, #94a3b8)'
+                            }}>
+                                Are you an admin?{' '}
+                                <a href="/login" onClick={(e) => {
+                                    e.preventDefault();
+                                    navigate('/login');
+                                }} style={{ color: 'var(--primary-400, #818cf8)', fontWeight: 500, textDecoration: 'none' }}>
+                                    Admin Login
+                                </a>
+                            </div>}
                     </form>
                 </div>
             </div>
