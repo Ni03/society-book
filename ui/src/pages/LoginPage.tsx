@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +10,11 @@ const LoginPage: React.FC = () => {
     const { login, isAuthenticated, isMember } = useAuth();
     const navigate  = useNavigate();
     const location  = useLocation();
+
+    // iOS PWA fix: mark this device as preferring the admin login route
+    useEffect(() => {
+        localStorage.setItem('preferredLogin', 'admin');
+    }, []);
 
     // Where to go after login: honour deep-link redirect, else dashboard
     const from = (location.state as any)?.from?.pathname + ((location.state as any)?.from?.search ?? '') || '/admin/dashboard';
@@ -94,6 +99,23 @@ const LoginPage: React.FC = () => {
                             )}
                         </button>
                     </form>
+                </div>
+                
+                {/* Link to Member login */}
+                <div style={{
+                    textAlign: 'center',
+                    marginTop: '1.5rem',
+                    marginBottom: '1rem',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-muted, #94a3b8)'
+                }}>
+                    Are you a resident?{' '}
+                    <a href="/member-login" onClick={(e) => {
+                        e.preventDefault();
+                        navigate('/member-login');
+                    }} style={{ color: 'var(--primary-400, #818cf8)', fontWeight: 500, textDecoration: 'none' }}>
+                        Member Login
+                    </a>
                 </div>
             </div>
         </div>

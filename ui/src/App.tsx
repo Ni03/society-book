@@ -36,8 +36,9 @@ const RootRedirect: React.FC = () => {
         return <Navigate to={isMember ? '/member/profile' : '/admin/dashboard'} replace />;
     }
     // Read stored preference (set by MemberLoginPage / LoginPage on mount)
+    // Default to member login for PWAs without storage access, as they are 99% of users.
     const preferred = localStorage.getItem('preferredLogin');
-    return <Navigate to={preferred === 'member' ? '/member-login' : '/login'} replace />;
+    return <Navigate to={preferred === 'admin' ? '/login' : '/member-login'} replace />;
 };
 
 const App: React.FC = () => {
@@ -68,7 +69,7 @@ const App: React.FC = () => {
                     <Route
                         path="*"
                         element={<Navigate
-                            to={localStorage.getItem('preferredLogin') === 'member' ? '/member-login' : '/login'}
+                            to={localStorage.getItem('preferredLogin') === 'admin' ? '/login' : '/member-login'}
                             replace
                         />}
                     />
