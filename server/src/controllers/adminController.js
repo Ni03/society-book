@@ -1,9 +1,9 @@
 const Member = require('../models/Member');
 const Visitor = require('../models/Visitor');
-const ExcelJS = require('exceljs');
 const archiver = require('archiver');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 
 // GET /api/admin/members - Get all members of chairman's wing
@@ -611,20 +611,47 @@ const exportAttachments = async (req, res) => {
         archive.pipe(res);
 
         let filesAdded = 0;
-        members.forEach(m => {
+        // Use a for...of loop to support await accurately with streams
+        for (const m of members) {
             const attachmentPath = m.type === 'owner' ? m.ownerDetails?.index2 : m.tenantDetails?.agreement;
             if (attachmentPath) {
-                const cleanAppPath = attachmentPath.startsWith('/') ? attachmentPath.slice(1) : attachmentPath;
-                const fullPath = path.join(__dirname, '../../', cleanAppPath);
+                const folder = `${m.wing}-${m.flatNo}`;
                 
-                if (fs.existsSync(fullPath)) {
-                    const name = path.basename(fullPath);
-                    const folder = `${m.wing}-${m.flatNo}`;
-                    archive.file(fullPath, { name: `${folder}/${name}` });
-                    filesAdded++;
+                if (attachmentPath.startsWith('http')) {
+                    try {
+                        let name = `document_${m._id}.pdf`;
+                        try {
+                            name = path.basename(new URL(attachmentPath).pathname);
+                        } catch(e) {}
+                        
+                        const stream = await new Promise((resolve, reject) => {
+                            https.get(attachmentPath, (response) => {
+                                if (response.statusCode === 200) {
+                                    resolve(response);
+                                } else {
+                                    response.resume(); // consume response data to free up memory
+                                    reject(new Error(`Failed to download ${attachmentPath}: ${response.statusCode}`));
+                                }
+                            }).on('error', reject);
+                        });
+                        
+                        archive.append(stream, { name: `${folder}/${name}` });
+                        filesAdded++;
+                    } catch (err) {
+                        console.warn('Could not zip cloud attachment:', err.message);
+                    }
+                } else {
+                    const cleanAppPath = attachmentPath.startsWith('/') ? attachmentPath.slice(1) : attachmentPath;
+                    const fullPath = path.join(__dirname, '../../', cleanAppPath);
+                    
+                    if (fs.existsSync(fullPath)) {
+                        const name = path.basename(fullPath);
+                        archive.file(fullPath, { name: `${folder}/${name}` });
+                        filesAdded++;
+                    }
                 }
             }
-        });
+        }
 
         if (filesAdded === 0) {
             archive.append('No attachments found for the selected members.', { name: 'empty.txt' });

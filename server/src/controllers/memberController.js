@@ -182,28 +182,12 @@ const updateMemberProfile = async (req, res) => {
             req.files && req.files['attachment'] ? req.files['attachment'][0] : null;
 
         if (attachmentFile) {
-            // Delete old attachment from disk
-            const oldPath =
-                member.type === 'owner'
-                    ? member.ownerDetails?.index2
-                    : member.tenantDetails?.agreement;
-
-            if (oldPath) {
-                const fullOld = path.join(__dirname, '../../uploads', path.basename(oldPath));
-                fs.unlink(fullOld, (err) => {
-                    if (err && err.code !== 'ENOENT') {
-                        console.warn('Could not delete old attachment:', err.message);
-                    }
-                });
-            }
-
-            const filePath = `/uploads/${attachmentFile.filename}`;
             if (member.type === 'owner') {
-                updateData.ownerDetails = { index2: filePath };
+                updateData.ownerDetails = { index2: attachmentFile.path };
             } else {
                 updateData.tenantDetails = {
                     ...(tenantDetails || {}),
-                    agreement: filePath,
+                    agreement: attachmentFile.path,
                 };
             }
         } else if (member.type === 'tenant' && tenantDetails) {

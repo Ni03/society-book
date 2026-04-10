@@ -4,10 +4,6 @@ import toast from 'react-hot-toast';
 import api from '../api/axios';
 import type { Member, MembersResponse } from '../types';
 
-const SERVER_ORIGIN = import.meta.env.VITE_SERVER_ORIGIN;
-const getUploadUrl = (path: string) =>
-    path.startsWith('http') ? path : `${SERVER_ORIGIN}${path}`;
-
 const MembersPage: React.FC = () => {
     const [members, setMembers] = useState<Member[]>([]);
     const [stats, setStats] = useState({ total: 0, owners: 0, tenants: 0 });
@@ -291,7 +287,7 @@ const MembersPage: React.FC = () => {
                                                     <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-secondary)' }}>📄 Index 2</div>
                                                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                                         <a
-                                                            href={getUploadUrl(member.ownerDetails.index2)}
+                                                            href={member.ownerDetails.index2}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="btn btn--secondary btn--sm"
@@ -300,7 +296,7 @@ const MembersPage: React.FC = () => {
                                                             👁️ View
                                                         </a>
                                                         <a
-                                                            href={getUploadUrl(member.ownerDetails.index2)}
+                                                            href={member.ownerDetails.index2}
                                                             download
                                                             className="btn btn--primary btn--sm"
                                                             id={`download-index2-${member._id}`}
@@ -317,7 +313,7 @@ const MembersPage: React.FC = () => {
                                                             <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-secondary)' }}>📄 Agreement</div>
                                                             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                                                 <a
-                                                                    href={getUploadUrl(member.tenantDetails.agreement)}
+                                                                    href={member.tenantDetails.agreement}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
                                                                     className="btn btn--secondary btn--sm"
@@ -326,7 +322,7 @@ const MembersPage: React.FC = () => {
                                                                     👁️ View
                                                                 </a>
                                                                 <a
-                                                                    href={getUploadUrl(member.tenantDetails.agreement)}
+                                                                    href={member.tenantDetails.agreement}
                                                                     download
                                                                     className="btn btn--primary btn--sm"
                                                                     id={`download-agreement-${member._id}`}

@@ -5,10 +5,6 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import type { Member, Visitor, SearchResponse } from '../types';
 
-const SERVER_ORIGIN = import.meta.env.VITE_SERVER_ORIGIN;
-const getUploadUrl = (path: string) =>
-    path.startsWith('http') ? path : `${SERVER_ORIGIN}${path}`;
-
 const VehicleSearchPage: React.FC = () => {
     const [registrationNo, setRegistrationNo] = useState('');
     const [loading, setLoading] = useState(false);
@@ -252,7 +248,7 @@ const VehicleSearchPage: React.FC = () => {
                                             <div className="member-card__field-label">📄 Index 2 Document</div>
                                             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '6px', flexWrap: 'wrap' }}>
                                                 <a
-                                                    href={getUploadUrl(member.ownerDetails.index2)}
+                                                    href={member.ownerDetails.index2}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="btn btn--secondary btn--sm"
@@ -261,7 +257,7 @@ const VehicleSearchPage: React.FC = () => {
                                                     👁️ View
                                                 </a>
                                                 <a
-                                                    href={getUploadUrl(member.ownerDetails.index2)}
+                                                    href={member.ownerDetails.index2}
                                                     download
                                                     className="btn btn--primary btn--sm"
                                                     id={`download-index2-${member._id}`}
@@ -279,7 +275,7 @@ const VehicleSearchPage: React.FC = () => {
                                                     <div className="member-card__field-label">📄 Rental Agreement</div>
                                                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '6px', flexWrap: 'wrap' }}>
                                                         <a
-                                                            href={getUploadUrl(member.tenantDetails.agreement)}
+                                                            href={member.tenantDetails.agreement}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="btn btn--secondary btn--sm"
@@ -288,7 +284,7 @@ const VehicleSearchPage: React.FC = () => {
                                                             👁️ View
                                                         </a>
                                                         <a
-                                                            href={getUploadUrl(member.tenantDetails.agreement)}
+                                                            href={member.tenantDetails.agreement}
                                                             download
                                                             className="btn btn--primary btn--sm"
                                                             id={`download-agreement-${member._id}`}

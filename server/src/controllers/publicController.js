@@ -150,11 +150,11 @@ const createMember = async (req, res) => {
 
         // Add type-specific details
         if (type.toLowerCase() === 'owner') {
-            memberData.ownerDetails = { index2: index2File ? `/uploads/${index2File.filename}` : null };
+            memberData.ownerDetails = { index2: index2File ? index2File.path : null };
             memberData.tenantDetails = { agreement: null, lastDayOfAgreement: null };
         } else {
             memberData.tenantDetails = {
-                agreement: agreementFile ? `/uploads/${agreementFile.filename}` : null,
+                agreement: agreementFile ? agreementFile.path : null,
                 lastDayOfAgreement: new Date(tenantDetails.lastDayOfAgreement),
             };
             memberData.ownerDetails = { index2: null };

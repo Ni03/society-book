@@ -95,7 +95,15 @@ const MemberProfilePage: React.FC = () => {
             });
             if (res.data.success) {
                 toast.success('Profile updated successfully!');
-                setMember(res.data.data);
+                const updatedMember = res.data.data;
+                setMember(updatedMember);
+                setInitialValues((prev) => ({
+                    ...prev,
+                    currentFileUrl:
+                        updatedMember.type === 'owner'
+                            ? updatedMember.ownerDetails?.index2
+                            : updatedMember.tenantDetails?.agreement,
+                }));
             }
         } catch (err: any) {
             toast.error(err.response?.data?.message || 'Failed to update profile');
