@@ -66,6 +66,10 @@ const MemberProfilePage: React.FC = () => {
             formData.append('email', data.email.trim());
             formData.append('caste', data.caste);
             formData.append('flatNo', data.flatNo.trim());
+            if (member) {
+                formData.append('fullName', member.fullName);
+                formData.append('type', member.type);
+            }
             formData.append('vehicles', JSON.stringify({
                 bikes: {
                     count: data.vehicles.bikes.count,
@@ -86,7 +90,9 @@ const MemberProfilePage: React.FC = () => {
             }
             if (data.file) formData.append('attachment', data.file);
 
-            const res = await api.put('/member/profile', formData);
+            const res = await api.put('/member/profile', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
             if (res.data.success) {
                 toast.success('Profile updated successfully!');
                 setMember(res.data.data);

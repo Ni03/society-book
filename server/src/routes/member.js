@@ -30,10 +30,17 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) =>
         cb(null, path.join(__dirname, '../../uploads/')),
     filename: (req, file, cb) => {
-        const wing   = sanitizeName(req.member?.wing)   || 'Wing';
-        const flatNo = sanitizeName(req.member?.flatNo) || 'Flat';
-        const ext    = path.extname(file.originalname).toLowerCase() || '';
-        cb(null, `${wing}${flatNo}-Attachment-${Date.now()}${ext}`);
+        const wing = (req.member?.wing || '').trim();
+        // Since MemberProfilePage appends flatNo to FormData before the file, we can prefer req.body.flatNo if available
+        const flatNo = (req.body.flatNo || req.member?.flatNo || '').trim();
+        const name = (req.body.fullName || '').trim() || 'Member';
+        const type = (req.body.type || '').trim().toLowerCase();
+        const docType = type === 'owner' ? 'index2' : 'agreement';
+        const ext = path.extname(file.originalname).toLowerCase() || '';
+        
+        // Format: J-101-Shubham Patil-index2.pdf
+        const filename = `${wing}-${flatNo}-${name}-${docType}${ext}`;
+        cb(null, filename);
     },
 });
 

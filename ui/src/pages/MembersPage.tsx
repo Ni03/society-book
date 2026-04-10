@@ -4,8 +4,7 @@ import toast from 'react-hot-toast';
 import api from '../api/axios';
 import type { Member, MembersResponse } from '../types';
 
-// Build the full URL for an upload path (e.g. /uploads/file.pdf)
-const SERVER_ORIGIN = 'http://localhost:5000';
+const SERVER_ORIGIN = import.meta.env.VITE_SERVER_ORIGIN;
 const getUploadUrl = (path: string) =>
     path.startsWith('http') ? path : `${SERVER_ORIGIN}${path}`;
 

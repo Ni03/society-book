@@ -33,6 +33,9 @@ const FileViewLink: React.FC<FileViewLinkProps> = ({
         ) : null;
     }
 
+    const SERVER_ORIGIN = import.meta.env.VITE_SERVER_ORIGIN;
+    const displayUrl = fileUrl.startsWith('http') ? fileUrl : `${SERVER_ORIGIN}${fileUrl}`;
+
     return (
         <div
             style={{
@@ -46,7 +49,7 @@ const FileViewLink: React.FC<FileViewLinkProps> = ({
             }}
         >
             <a
-                href={fileUrl}
+                href={displayUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: 'var(--primary-600)', fontWeight: 600, textDecoration: 'none' }}

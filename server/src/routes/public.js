@@ -15,14 +15,14 @@ const storage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         // req.body fields that appear before the file in the FormData are available here
-        const wing = sanitize(req.body.wing) || 'Wing';
-        const flatNo = sanitize(req.body.flatNo) || 'Flat';
-        const name = sanitize(req.body.fullName) || 'Member';
-        const docType = file.fieldname === 'index2' ? 'Index2' : 'Agreement';
+        const wing = (req.body.wing || '').trim();
+        const flatNo = (req.body.flatNo || '').trim();
+        const name = (req.body.fullName || '').trim() || 'Member';
+        const docType = file.fieldname === 'index2' ? 'index2' : 'agreement';
         const ext = path.extname(file.originalname).toLowerCase() || '';
 
-        // Format: WingA-101-John_Doe-Index2.pdf
-        const filename = `${wing}${flatNo}-${name}-${docType}${ext}`;
+        // Format: J-101-Shubham Patil-index2.pdf
+        const filename = `${wing}-${flatNo}-${name}-${docType}${ext}`;
         cb(null, filename);
     }
 });
