@@ -7,23 +7,24 @@ import type { Visitor } from '../types';
 
 // ── Context shape passed to child pages via <Outlet context> ──────────────────
 export interface MemberLayoutContext {
-    openQuickModal:   (visitorId: string) => void;
-    refreshVisitors:  () => void;
-    pendingCount:     number;
+    openQuickModal: (visitorId: string) => void;
+    refreshVisitors: () => void;
+    pendingCount: number;
 }
 
 const MemberLayout: React.FC = () => {
+    const enableBetaFeatures = import.meta.env.VITE_ENABLE_BETA_FEATURES !== 'false';
     const { wing, logout } = useAuth();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [pendingCount, setPendingCount] = useState(0);
 
     // ── Quick-action modal state (global — works on any member page) ─────────
-    const [quickModal,   setQuickModal]   = useState<Visitor | null>(null);
-    const [rejectMode,   setRejectMode]   = useState(false);
+    const [quickModal, setQuickModal] = useState<Visitor | null>(null);
+    const [rejectMode, setRejectMode] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
-    const [actioningId,  setActioningId]  = useState<string | null>(null);
-    const [modalPhoto,   setModalPhoto]   = useState<string | null>(null);
+    const [actioningId, setActioningId] = useState<string | null>(null);
+    const [modalPhoto, setModalPhoto] = useState<string | null>(null);
     const [photoLoading, setPhotoLoading] = useState(false);
 
     // A ref to the refresh callback registered by MemberVisitorsPage
@@ -92,7 +93,7 @@ const MemberLayout: React.FC = () => {
                 const { visitorId, action } = event.data;
                 if (action === 'approve') {
                     // User tapped native Approve button — open modal then auto-approve
-                    openQuickModal(visitorId).then?.(() => {}).catch?.(() => {});
+                    openQuickModal(visitorId).then?.(() => { }).catch?.(() => { });
                     // Small delay so modal state is set before we fire the action
                     setTimeout(() => handleApprove(visitorId), 400);
                 } else if (action === 'deny') {
@@ -208,7 +209,7 @@ const MemberLayout: React.FC = () => {
                     </NavLink>
 
                     {/* Visitor Alerts — with pending badge */}
-                    <NavLink
+                    {enableBetaFeatures && <NavLink
                         to="/member/visitors"
                         end
                         className={({ isActive }) =>
@@ -232,10 +233,10 @@ const MemberLayout: React.FC = () => {
                                 {pendingCount}
                             </span>
                         )}
-                    </NavLink>
+                    </NavLink>}
 
                     {/* Visitor Log */}
-                    <NavLink
+                    {enableBetaFeatures && <NavLink
                         to="/member/visitors/history"
                         className={({ isActive }) =>
                             `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
@@ -243,7 +244,7 @@ const MemberLayout: React.FC = () => {
                         id="nav-member-log"
                     >
                         <span>📋</span> Visitor Log
-                    </NavLink>
+                    </NavLink>}
                 </aside>
 
                 <main className="admin-content">

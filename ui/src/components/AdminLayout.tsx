@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
 const AdminLayout: React.FC = () => {
+    const enableBetaFeatures = import.meta.env.VITE_ENABLE_BETA_FEATURES !== 'false';
     const { wing, role, logout } = useAuth();
     const navigate = useNavigate();
     const isSecurity = role === 'security';
@@ -103,7 +104,7 @@ const AdminLayout: React.FC = () => {
                             </NavLink>
 
 
-                            <NavLink
+                            {enableBetaFeatures && <NavLink
                                 to="/admin/visitors/history"
                                 className={({ isActive }) =>
                                     `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
@@ -111,7 +112,7 @@ const AdminLayout: React.FC = () => {
                                 id="nav-visitor-history"
                             >
                                 <span>📋</span> Visitor Log
-                            </NavLink>
+                            </NavLink>}
                         </>
                     )}
                 </aside>
