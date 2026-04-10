@@ -130,7 +130,7 @@ const VehicleSearchPage: React.FC = () => {
                                             {member.type === 'owner' ? '🏠 Owner' : '📋 Tenant'}
                                         </span>
                                         <span className="badge badge--wing">
-                                            Wing {member.wing}
+                                            Wing {member.wing} · Flat {member.flatNo}
                                         </span>
                                     </div>
                                 </div>
@@ -139,6 +139,12 @@ const VehicleSearchPage: React.FC = () => {
                                         <div className="member-card__field-label">Phone</div>
                                         <div className="member-card__field-value">
                                             {member.phoneNumber}
+                                        </div>
+                                    </div>
+                                    <div className="member-card__field">
+                                        <div className="member-card__field-label">Flat No</div>
+                                        <div className="member-card__field-value">
+                                            {member.flatNo}
                                         </div>
                                     </div>
                                     <div className="member-card__field">
