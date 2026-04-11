@@ -69,8 +69,8 @@
   --gradient-primary: linear-gradient(135deg, #6366f1, #8b5cf6, #a855f7);
   --gradient-accent: linear-gradient(135deg, #10b981, #06b6d4);
   --gradient-hero: linear-gradient(135deg, #1e1b4b 0%, #312e81 25%, #4338ca 50%, #6366f1 75%, #818cf8 100%);
-  --gradient-card: linear-gradient(145deg, rgba(255,255,255, 0.9), rgba(255,255,255, 0.6));
-  --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6));
+  --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
 
   /* Shadows */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -116,7 +116,9 @@
    Reset & Base
    ============================================ */
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -155,7 +157,9 @@ button {
   font-family: inherit;
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   font-family: inherit;
   font-size: inherit;
 }
@@ -196,7 +200,7 @@ input, select, textarea {
   top: 0;
   z-index: 100;
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .navbar__inner {
@@ -217,7 +221,7 @@ input, select, textarea {
 .navbar__logo {
   width: 40px;
   height: 40px;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: var(--border-radius-md);
   display: flex;
   align-items: center;
@@ -225,7 +229,11 @@ input, select, textarea {
   font-size: 1.25rem;
   font-weight: 800;
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.navbar__logo img {
+  scale: 2;
 }
 
 .navbar__title {
@@ -247,14 +255,14 @@ input, select, textarea {
 }
 
 .navbar__wing-badge {
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   color: white;
   padding: var(--space-2) var(--space-4);
   border-radius: var(--border-radius-full);
   font-size: 0.8rem;
   font-weight: 600;
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -285,7 +293,7 @@ input, select, textarea {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(rgba(255,255,255,0.15), transparent);
+  background: linear-gradient(rgba(255, 255, 255, 0.15), transparent);
   opacity: 0;
   transition: opacity var(--transition-fast);
 }
@@ -322,7 +330,8 @@ input, select, textarea {
 }
 
 .btn--success {
-  background: var(--gradient-accent); /* Emerald to Cyan */
+  background: var(--gradient-accent);
+  /* Emerald to Cyan */
   color: white;
   box-shadow: var(--shadow-md), var(--shadow-glow-accent);
 }
@@ -369,12 +378,12 @@ input, select, textarea {
 .btn--ghost {
   background: transparent;
   color: white;
-  border-color: rgba(255,255,255,0.3);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .btn--ghost:hover {
-  background: rgba(255,255,255,0.1);
-  border-color: rgba(255,255,255,0.5);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .btn--sm {
@@ -402,7 +411,7 @@ input, select, textarea {
 .btn .spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255,255,255,0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: white;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -583,9 +592,17 @@ select.form-input {
   height: 4px;
 }
 
-.stat-card--primary::before { background: var(--gradient-primary); }
-.stat-card--accent::before { background: var(--gradient-accent); }
-.stat-card--warning::before { background: linear-gradient(135deg, var(--warning-400), var(--warning-500)); }
+.stat-card--primary::before {
+  background: var(--gradient-primary);
+}
+
+.stat-card--accent::before {
+  background: var(--gradient-accent);
+}
+
+.stat-card--warning::before {
+  background: linear-gradient(135deg, var(--warning-400), var(--warning-500));
+}
 
 .stat-card:hover {
   transform: translateY(-4px);
@@ -812,7 +829,7 @@ select.form-input {
   position: absolute;
   inset: 0;
   background: radial-gradient(circle at 30% 40%, rgba(139, 92, 246, 0.3), transparent 50%),
-              radial-gradient(circle at 70% 60%, rgba(99, 102, 241, 0.2), transparent 50%);
+    radial-gradient(circle at 70% 60%, rgba(99, 102, 241, 0.2), transparent 50%);
 }
 
 .hero__content {
@@ -824,14 +841,14 @@ select.form-input {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(8px);
   padding: var(--space-2) var(--space-5);
   border-radius: var(--border-radius-full);
   font-size: 0.85rem;
   font-weight: 600;
   margin-bottom: var(--space-4);
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .hero__title {
@@ -1271,6 +1288,7 @@ select.form-input {
   .admin-layout {
     flex-direction: column;
   }
+
   .sidebar {
     width: 100%;
     flex-direction: row;
@@ -1279,6 +1297,7 @@ select.form-input {
     border-right: none;
     border-bottom: 1px solid var(--border-color);
   }
+
   .sidebar__link {
     white-space: nowrap;
   }
@@ -1289,17 +1308,33 @@ select.form-input {
    ============================================ */
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(239,68,68,0.6); }
-  50%       { opacity: 0.85; box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+  }
+
+  50% {
+    opacity: 0.85;
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
@@ -1307,6 +1342,7 @@ select.form-input {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1318,6 +1354,7 @@ select.form-input {
     opacity: 0;
     transform: translateY(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1329,12 +1366,15 @@ select.form-input {
     opacity: 0;
     transform: scale(0.3);
   }
+
   50% {
     transform: scale(1.1);
   }
+
   70% {
     transform: scale(0.95);
   }
+
   100% {
     opacity: 1;
     transform: scale(1);

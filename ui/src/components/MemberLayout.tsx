@@ -172,9 +172,11 @@ const MemberLayout: React.FC = () => {
             <nav className="navbar">
                 <div className="navbar__inner">
                     <div className="navbar__brand">
-                        <div className="navbar__logo">SB</div>
+                        <div className="navbar__logo">
+                            <img src="/vite.svg" alt="Resident Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        </div>
                         <div>
-                            <div className="navbar__title">Society Book</div>
+                            <div className="navbar__title">Resident Management System</div>
                             <div className="navbar__subtitle">Wing {wing} · Flat {flatNo}</div>
                         </div>
                     </div>

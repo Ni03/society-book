@@ -1,7 +1,7 @@
 {
-  "name": "Society Book",
-  "short_name": "SocietyBook",
-  "description": "Society Book Management System",
+  "name": "Resident",
+  "short_name": "Resident",
+  "description": "Resident Management System",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

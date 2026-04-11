@@ -1,5 +1,5 @@
 /**
- * sw.js  — Service Worker for Society Book PWA
+ * sw.js  — Service Worker for Resident PWA
  *
  * Handles:
  *   • push events  → shows a rich notification with Approve/Deny actions
@@ -10,7 +10,7 @@
  * Android Chrome: fully supported, including action buttons.
  */
 
-self.addEventListener('install',  () => self.skipWaiting());
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
 /* ── Push received ──────────────────────────────────────────────────────── */
@@ -19,10 +19,10 @@ self.addEventListener('push', (event) => {
     try {
         data = event.data ? event.data.json() : {};
     } catch {
-        data = { title: 'Society Book', body: event.data?.text() ?? 'New notification' };
+        data = { title: 'Resident', body: event.data?.text() ?? 'New notification' };
     }
 
-    const title    = data.title ?? 'Society Book';
+    const title = data.title ?? 'Resident';
     const isVisitorAlert = !!data.visitorId;
 
     // Use the URL the server already set (e.g. /member/visitors?visitor=ID for members).
@@ -31,12 +31,12 @@ self.addEventListener('push', (event) => {
         : '/');
 
     const options = {
-        body:    data.body  ?? '',
-        icon:    data.icon  ?? '/vite.svg',
-        badge:   data.badge ?? '/vite.svg',
-        tag:     data.tag   ?? 'visitor-update',
+        body: data.body ?? '',
+        icon: data.icon ?? '/vite.svg',
+        badge: data.badge ?? '/vite.svg',
+        tag: data.tag ?? 'visitor-update',
         data: {
-            url:       deepLink,
+            url: deepLink,
             visitorId: data.visitorId ?? null,
         },
         requireInteraction: data.requireInteraction ?? true,
@@ -44,9 +44,9 @@ self.addEventListener('push', (event) => {
         // Action buttons shown on lock screen / notification tray (Android Chrome)
         actions: isVisitorAlert
             ? [
-                { action: 'approve', title: '✅ Let In'  },
-                { action: 'deny',    title: '❌ Deny'     },
-              ]
+                { action: 'approve', title: '✅ Let In' },
+                { action: 'deny', title: '❌ Deny' },
+            ]
             : (data.actions ?? []),
     };
 
@@ -59,7 +59,7 @@ self.addEventListener('notificationclick', (event) => {
 
     const notifData = event.notification.data ?? {};
     const visitorId = notifData.visitorId ?? null;
-    let   targetUrl = notifData.url ?? '/';
+    let targetUrl = notifData.url ?? '/';
 
     // If a native action button was pressed, mark the action in the URL
     // so the React app can act immediately when it (re-)opens.
@@ -83,7 +83,7 @@ self.addEventListener('notificationclick', (event) => {
                         // postMessage tells the React app to show the modal instantly
                         if (visitorId) {
                             client.postMessage({
-                                type:      'VISITOR_NOTIFICATION_CLICK',
+                                type: 'VISITOR_NOTIFICATION_CLICK',
                                 visitorId,
                                 targetUrl,
                                 action,    // 'approve' | 'deny' | '' — app may auto-act
