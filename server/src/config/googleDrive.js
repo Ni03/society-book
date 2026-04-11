@@ -66,7 +66,7 @@ const uploadFileToGoogleDrive = async (fileObject, filename) => {
             },
         });
 
-        return response.data.webViewLink;
+        return response.data.webContentLink;
     } catch (error) {
         console.error('Error uploading file to Google Drive:', error);
         throw error;

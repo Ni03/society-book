@@ -4,6 +4,7 @@ const archiver = require('archiver');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const http = require('http');
 
 
 // GET /api/admin/members - Get all members of chairman's wing
@@ -619,21 +620,61 @@ const exportAttachments = async (req, res) => {
                 
                 if (attachmentPath.startsWith('http')) {
                     try {
+                        let fileUrl = attachmentPath;
+                        
+                        // If it's a Google Drive viewer URL, convert to direct download URL
+                        if (fileUrl.includes('drive.google.com/file/d/')) {
+                            const match = fileUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                            if (match) {
+                                fileUrl = `https://drive.google.com/uc?id=${match[1]}&export=download`;
+                            }
+                        }
+
                         let name = `document_${m._id}.pdf`;
                         try {
-                            name = path.basename(new URL(attachmentPath).pathname);
+                            // Extract just the filename part, throwing away query params (like Drive's ?id=...)
+                            const urlObj = new URL(fileUrl);
+                            if (urlObj.pathname !== '/uc') {
+                                name = path.basename(urlObj.pathname);
+                            }
                         } catch(e) {}
                         
-                        const stream = await new Promise((resolve, reject) => {
-                            https.get(attachmentPath, (response) => {
-                                if (response.statusCode === 200) {
-                                    resolve(response);
-                                } else {
-                                    response.resume(); // consume response data to free up memory
-                                    reject(new Error(`Failed to download ${attachmentPath}: ${response.statusCode}`));
-                                }
-                            }).on('error', reject);
-                        });
+                        const fetchWithRedirects = (url, redirects = 0) => {
+                            return new Promise((resolve, reject) => {
+                                if (redirects > 5) return reject(new Error('Too many redirects'));
+                                
+                                const client = url.startsWith('http:') ? http : https;
+                                client.get(url, (response) => {
+                                    if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
+                                        response.resume(); // free memory
+                                        let redirectUrl = response.headers.location;
+                                        if (!redirectUrl.startsWith('http')) {
+                                            redirectUrl = new URL(redirectUrl, url).href;
+                                        }
+                                        resolve(fetchWithRedirects(redirectUrl, redirects + 1));
+                                    } else if (response.statusCode === 200) {
+                                        // Attempt to read extension from content-type
+                                        let determinedExt = '.pdf';
+                                        if (response.headers['content-type']) {
+                                            const type = response.headers['content-type'].toLowerCase();
+                                            if (type.includes('image/jpeg') || type.includes('image/jpg')) determinedExt = '.jpg';
+                                            else if (type.includes('image/png')) determinedExt = '.png';
+                                        }
+                                        resolve({ stream: response, ext: determinedExt });
+                                    } else {
+                                        response.resume();
+                                        reject(new Error(`Failed to download ${url}: ${response.statusCode}`));
+                                    }
+                                }).on('error', reject);
+                            });
+                        };
+
+                        const { stream, ext } = await fetchWithRedirects(fileUrl);
+                        
+                        // Replace hardcoded .pdf default with the correctly identified extension
+                        if (name.endsWith('.pdf') && ext !== '.pdf') {
+                            name = name.replace('.pdf', ext);
+                        }
                         
                         archive.append(stream, { name: `${folder}/${name}` });
                         filesAdded++;
