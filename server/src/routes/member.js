@@ -22,34 +22,12 @@ const {
     getMemberVisitorPhoto,
 } = require('../controllers/visitorController');
 
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const cloudinary = require('../config/cloudinary');
-
 // ── Multer (attachment upload for member self-update) ──────────────────────────
 const sanitizeName = (str) =>
     (str || '').trim().replace(/\s+/g, '_').replace(/[^A-Za-z0-9_\-]/g, '');
 
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: async (req, file) => {
-        const wing = (req.member?.wing || '').trim();
-        const flatNo = (req.body.flatNo || req.member?.flatNo || '').trim();
-        const name = (req.body.fullName || '').trim() || 'Member';
-        const type = (req.body.type || '').trim().toLowerCase();
-        const docType = type === 'owner' ? 'index2' : 'agreement';
-
-        const public_id = `${wing}-${flatNo}-${name}-${docType}`;
-
-        return {
-            folder: 'society_book_uploads',
-            public_id: public_id,
-            resource_type: 'auto',
-        };
-    },
-});
-
 const upload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];

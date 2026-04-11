@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const Member = require('../models/Member');
+const { uploadFileToGoogleDrive } = require('../config/googleDrive');
 const fs = require('fs');
 const path = require('path');
 
@@ -182,12 +183,16 @@ const updateMemberProfile = async (req, res) => {
             req.files && req.files['attachment'] ? req.files['attachment'][0] : null;
 
         if (attachmentFile) {
+            const docType = member.type === 'owner' ? 'index2' : 'agreement';
+            const fileName = `${member.wing}-${updateData.flatNo || member.flatNo}-${member.fullName}-${docType}${path.extname(attachmentFile.originalname)}`;
+            const fileLink = await uploadFileToGoogleDrive(attachmentFile, fileName);
+
             if (member.type === 'owner') {
-                updateData.ownerDetails = { index2: attachmentFile.path };
+                updateData.ownerDetails = { index2: fileLink };
             } else {
                 updateData.tenantDetails = {
                     ...(tenantDetails || {}),
-                    agreement: attachmentFile.path,
+                    agreement: fileLink,
                 };
             }
         } else if (member.type === 'tenant' && tenantDetails) {

@@ -1,4 +1,6 @@
+const path = require('path');
 const Member = require('../models/Member');
+const { uploadFileToGoogleDrive } = require('../config/googleDrive');
 
 const VALID_WINGS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 
@@ -148,13 +150,25 @@ const createMember = async (req, res) => {
             },
         };
 
+        // Upload files to Google Drive
+        let index2Link = null;
+        let agreementLink = null;
+
+        if (type.toLowerCase() === 'owner' && index2File) {
+            const fileName = `${wing.toUpperCase()}-${flatNo.trim()}-${fullName.trim()}-index2${path.extname(index2File.originalname)}`;
+            index2Link = await uploadFileToGoogleDrive(index2File, fileName);
+        } else if (type.toLowerCase() === 'tenant' && agreementFile) {
+            const fileName = `${wing.toUpperCase()}-${flatNo.trim()}-${fullName.trim()}-agreement${path.extname(agreementFile.originalname)}`;
+            agreementLink = await uploadFileToGoogleDrive(agreementFile, fileName);
+        }
+
         // Add type-specific details
         if (type.toLowerCase() === 'owner') {
-            memberData.ownerDetails = { index2: index2File ? index2File.path : null };
+            memberData.ownerDetails = { index2: index2Link };
             memberData.tenantDetails = { agreement: null, lastDayOfAgreement: null };
         } else {
             memberData.tenantDetails = {
-                agreement: agreementFile ? agreementFile.path : null,
+                agreement: agreementLink,
                 lastDayOfAgreement: new Date(tenantDetails.lastDayOfAgreement),
             };
             memberData.ownerDetails = { index2: null };
