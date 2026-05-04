@@ -1,6 +1,7 @@
 const Member = require('../models/Member');
 const Visitor = require('../models/Visitor');
 const archiver = require('archiver');
+const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -34,20 +35,20 @@ const getMembers = async (req, res) => {
         const statsFilter = isSuperAdmin ? {} : { wing };
         const allMembers = await Member.find(statsFilter);
         const totalMembers = allMembers.length;
-        const owners  = allMembers.filter((m) => m.type === 'owner');
+        const owners = allMembers.filter((m) => m.type === 'owner');
         const tenants = allMembers.filter((m) => m.type === 'tenant');
-        const ownerCount  = owners.length;
+        const ownerCount = owners.length;
         const tenantCount = tenants.length;
 
         // Vehicle counts — total
-        const twoWheelerCount  = allMembers.reduce((sum, m) => sum + (m.vehicles?.bikes?.count || 0), 0);
-        const fourWheelerCount = allMembers.reduce((sum, m) => sum + (m.vehicles?.cars?.count  || 0), 0);
+        const twoWheelerCount = allMembers.reduce((sum, m) => sum + (m.vehicles?.bikes?.count || 0), 0);
+        const fourWheelerCount = allMembers.reduce((sum, m) => sum + (m.vehicles?.cars?.count || 0), 0);
 
         // Vehicle counts — by member type
-        const ownerTwoWheelers   = owners.reduce((sum, m)  => sum + (m.vehicles?.bikes?.count || 0), 0);
-        const ownerFourWheelers  = owners.reduce((sum, m)  => sum + (m.vehicles?.cars?.count  || 0), 0);
-        const tenantTwoWheelers  = tenants.reduce((sum, m) => sum + (m.vehicles?.bikes?.count || 0), 0);
-        const tenantFourWheelers = tenants.reduce((sum, m) => sum + (m.vehicles?.cars?.count  || 0), 0);
+        const ownerTwoWheelers = owners.reduce((sum, m) => sum + (m.vehicles?.bikes?.count || 0), 0);
+        const ownerFourWheelers = owners.reduce((sum, m) => sum + (m.vehicles?.cars?.count || 0), 0);
+        const tenantTwoWheelers = tenants.reduce((sum, m) => sum + (m.vehicles?.bikes?.count || 0), 0);
+        const tenantFourWheelers = tenants.reduce((sum, m) => sum + (m.vehicles?.cars?.count || 0), 0);
 
         res.json({
             success: true,
@@ -144,6 +145,7 @@ const updateMember = async (req, res) => {
             'flatNo',
             'email',
             'caste',
+            'birthDate',
             'vehicles',
             'ownerDetails',
             'tenantDetails',
@@ -178,6 +180,15 @@ const updateMember = async (req, res) => {
                     });
                 }
             }
+        }
+
+        // Always carry forward the existing name parts so fullName stays in sync
+        if (member.firstName || member.lastName) {
+            updateData.firstName = member.firstName || '';
+            updateData.middleName = member.middleName || '';
+            updateData.lastName = member.lastName || '';
+            updateData.fullName = [member.firstName, member.middleName, member.lastName]
+                .filter(Boolean).join(' ').trim();
         }
 
         const updatedMember = await Member.findByIdAndUpdate(id, updateData, {
@@ -376,23 +387,25 @@ const exportMembersExcel = async (req, res) => {
             }
         );
 
-        const COL_COUNT = 14;
+        const COL_COUNT = 16;
 
         sheet.columns = [
-            { header: '#', key: 'no', width: 6 },
-            { header: 'Floor Sr.', key: 'floorSeq', width: 8 },
-            { header: 'Full Name', key: 'fullName', width: 28 },
-            { header: 'Phone Number', key: 'phoneNumber', width: 16 },
-            { header: 'Flat No', key: 'flatNo', width: 10 },
-            { header: 'Wing', key: 'wing', width: 7 },
-            { header: 'Type', key: 'type', width: 10 },
-            { header: 'Bikes', key: 'bikes', width: 8 },
-            { header: 'Bike Reg.', key: 'bikeRegs', width: 28 },
-            { header: 'Cars', key: 'cars', width: 8 },
-            { header: 'Car Reg. (📡=FASTag)', key: 'carRegs', width: 35 },
-            { header: 'Parking Slot', key: 'parkingSlots', width: 18 },
-            { header: 'Attachment', key: 'attachment', width: 14 },
-            { header: 'Agreement Expiry', key: 'expiry', width: 18 },
+            { header: '#',                   key: 'no',           width: 6  },
+            { header: 'Floor Sr.',           key: 'floorSeq',     width: 8  },
+            { header: 'Full Name',           key: 'fullName',     width: 28 },
+            { header: 'Age',                 key: 'age',          width: 7  },
+            { header: 'Email ID',            key: 'email',        width: 30 },
+            { header: 'Phone Number',        key: 'phoneNumber',  width: 16 },
+            { header: 'Flat No',             key: 'flatNo',       width: 10 },
+            { header: 'Wing',                key: 'wing',         width: 7  },
+            { header: 'Type',                key: 'type',         width: 10 },
+            { header: 'Bikes',               key: 'bikes',        width: 8  },
+            { header: 'Bike Reg.',           key: 'bikeRegs',     width: 28 },
+            { header: 'Cars',                key: 'cars',         width: 8  },
+            { header: 'Car Reg. (📡=FASTag)', key: 'carRegs',      width: 35 },
+            { header: 'Parking Slot',        key: 'parkingSlots', width: 18 },
+            { header: 'Attachment',          key: 'attachment',   width: 14 },
+            { header: 'Agreement Expiry',    key: 'expiry',       width: 18 },
         ];
 
         // ── Style the main header row ─────────────────────────────────
@@ -476,28 +489,41 @@ const exportMembersExcel = async (req, res) => {
                 ? new Date(m.tenantDetails.lastDayOfAgreement)
                 : null;
 
+            // Calculate age from birthDate
+            const birthDateVal = m.birthDate ? new Date(m.birthDate) : null;
+            let age = '—';
+            if (birthDateVal) {
+                const today = new Date();
+                let years = today.getFullYear() - birthDateVal.getFullYear();
+                const monthDiff = today.getMonth() - birthDateVal.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateVal.getDate())) years--;
+                age = years;
+            }
+
             const row = sheet.addRow({
-                no: globalIdx,
-                floorSeq: floorSeq,
-                fullName: m.fullName,
-                phoneNumber: m.phoneNumber,
-                flatNo: m.flatNo,
-                wing: m.wing,
-                type: m.type.charAt(0).toUpperCase() + m.type.slice(1),
-                bikes: m.vehicles.bikes.count,
+                no:           globalIdx,
+                floorSeq:     floorSeq,
+                fullName:     m.fullName,
+                age,
+                email:        m.email || '—',
+                phoneNumber:  m.phoneNumber,
+                flatNo:       m.flatNo,
+                wing:         m.wing,
+                type:         m.type.charAt(0).toUpperCase() + m.type.slice(1),
+                bikes:        m.vehicles.bikes.count,
                 bikeRegs,
-                cars: m.vehicles.cars.count,
+                cars:         m.vehicles.cars.count,
                 carRegs,
                 // Parking slots for cars that have one assigned
                 parkingSlots: m.vehicles.cars.list
                     .filter(v => v.parkingSlot)
                     .map(v => `${v.regNo}: ${v.parkingSlot}`)
                     .join(', ') || '—',
-                attachment: hasAttachment,
+                attachment:   hasAttachment,
                 expiry,
             });
 
-            row.getCell('expiry').numFmt = 'dd-mmm-yyyy';
+            row.getCell('expiry').numFmt    = 'dd-mmm-yyyy';
 
             styleDataRow(row, m, globalIdx);
         });
@@ -510,18 +536,18 @@ const exportMembersExcel = async (req, res) => {
 
         // ── Totals row at bottom of Members sheet ─────────────────────
         const totalBikes = rawMembers.reduce((s, m) => s + (m.vehicles?.bikes?.count || 0), 0);
-        const totalCars  = rawMembers.reduce((s, m) => s + (m.vehicles?.cars?.count  || 0), 0);
-        const totalOwners  = rawMembers.filter(m => m.type === 'owner').length;
+        const totalCars = rawMembers.reduce((s, m) => s + (m.vehicles?.cars?.count || 0), 0);
+        const totalOwners = rawMembers.filter(m => m.type === 'owner').length;
         const totalTenants = rawMembers.filter(m => m.type === 'tenant').length;
 
         const totalsRow = sheet.addRow({});
         sheet.mergeCells(totalsRow.number, 1, totalsRow.number, 7);
         totalsRow.getCell(1).value = `📊  TOTALS — Members: ${rawMembers.length}  |  Owners: ${totalOwners}  |  Tenants: ${totalTenants}`;
-        totalsRow.getCell(8).value  = totalBikes;   // Bikes column
+        totalsRow.getCell(8).value = totalBikes;   // Bikes column
         totalsRow.getCell(10).value = totalCars;    // Cars column
         totalsRow.eachCell({ includeEmpty: true }, (cell) => {
-            cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
-            cell.font   = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
             cell.alignment = { vertical: 'middle', horizontal: 'left' };
             cell.border = { top: { style: 'medium', color: { argb: 'FF3B82F6' } } };
         });
@@ -542,8 +568,8 @@ const exportMembersExcel = async (req, res) => {
             const sRow = summarySheet.addRow(rowData);
             if (idx === 0) {
                 sRow.eachCell(cell => {
-                    cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
-                    cell.font   = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+                    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
                     cell.alignment = { vertical: 'middle', horizontal: 'center' };
                 });
                 sRow.height = 26;
@@ -560,7 +586,7 @@ const exportMembersExcel = async (req, res) => {
         });
         summarySheet.columns = [
             { key: 'metric', width: 28 },
-            { key: 'count',  width: 14 },
+            { key: 'count', width: 14 },
         ];
 
         // ── Stream response ───────────────────────────────────────────
@@ -604,7 +630,7 @@ const exportAttachments = async (req, res) => {
 
         const archive = archiver('zip', { zlib: { level: 9 } });
 
-        archive.on('error', function(err) {
+        archive.on('error', function (err) {
             console.error('Archive Error:', err);
             if (!res.headersSent) res.status(500).end();
         });
@@ -617,11 +643,11 @@ const exportAttachments = async (req, res) => {
             const attachmentPath = m.type === 'owner' ? m.ownerDetails?.index2 : m.tenantDetails?.agreement;
             if (attachmentPath) {
                 const folder = `${m.wing}-${m.flatNo}`;
-                
+
                 if (attachmentPath.startsWith('http')) {
                     try {
                         let fileUrl = attachmentPath;
-                        
+
                         // If it's a Google Drive viewer URL, convert to direct download URL
                         if (fileUrl.includes('drive.google.com/file/d/')) {
                             const match = fileUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -637,12 +663,12 @@ const exportAttachments = async (req, res) => {
                             if (urlObj.pathname !== '/uc') {
                                 name = path.basename(urlObj.pathname);
                             }
-                        } catch(e) {}
-                        
+                        } catch (e) { }
+
                         const fetchWithRedirects = (url, redirects = 0) => {
                             return new Promise((resolve, reject) => {
                                 if (redirects > 5) return reject(new Error('Too many redirects'));
-                                
+
                                 const client = url.startsWith('http:') ? http : https;
                                 client.get(url, (response) => {
                                     if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
@@ -670,12 +696,12 @@ const exportAttachments = async (req, res) => {
                         };
 
                         const { stream, ext } = await fetchWithRedirects(fileUrl);
-                        
+
                         // Replace hardcoded .pdf default with the correctly identified extension
                         if (name.endsWith('.pdf') && ext !== '.pdf') {
                             name = name.replace('.pdf', ext);
                         }
-                        
+
                         archive.append(stream, { name: `${folder}/${name}` });
                         filesAdded++;
                     } catch (err) {
@@ -684,7 +710,7 @@ const exportAttachments = async (req, res) => {
                 } else {
                     const cleanAppPath = attachmentPath.startsWith('/') ? attachmentPath.slice(1) : attachmentPath;
                     const fullPath = path.join(__dirname, '../../', cleanAppPath);
-                    
+
                     if (fs.existsSync(fullPath)) {
                         const name = path.basename(fullPath);
                         archive.file(fullPath, { name: `${folder}/${name}` });

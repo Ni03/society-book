@@ -137,7 +137,7 @@ const updateMemberProfile = async (req, res) => {
             try { tenantDetails = JSON.parse(tenantDetails); } catch (e) { tenantDetails = undefined; }
         }
 
-        const allowedUpdates = ['phoneNumber', 'flatNo', 'email', 'caste', 'vehicles'];
+        const allowedUpdates = ['phoneNumber', 'flatNo', 'email', 'caste', 'birthDate', 'vehicles'];
         const updateData = {};
 
         for (const key of allowedUpdates) {
@@ -201,6 +201,15 @@ const updateMemberProfile = async (req, res) => {
                 agreement: member.tenantDetails?.agreement || null,
                 lastDayOfAgreement: tenantDetails.lastDayOfAgreement || null,
             };
+        }
+
+        // Always carry forward the existing name parts so fullName stays in sync
+        if (member.firstName || member.lastName) {
+            updateData.firstName  = member.firstName  || '';
+            updateData.middleName = member.middleName || '';
+            updateData.lastName   = member.lastName   || '';
+            updateData.fullName   = [member.firstName, member.middleName, member.lastName]
+                .filter(Boolean).join(' ').trim();
         }
 
         const updatedMember = await Member.findByIdAndUpdate(

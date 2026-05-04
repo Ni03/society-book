@@ -8,13 +8,16 @@ const VALID_WINGS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 const createMember = async (req, res) => {
     try {
         const {
-            fullName,
+            firstName,
+            middleName,
+            lastName,
             phoneNumber,
             flatNo,
             wing,
             type,
             email,
             caste,
+            birthDate,
         } = req.body;
 
         // Parse JSON strings from FormData if they are strings
@@ -50,11 +53,19 @@ const createMember = async (req, res) => {
             });
         }
 
-        // Validate full name
-        if (!fullName || fullName.trim().length < 3) {
+        // Validate first name
+        if (!firstName || firstName.trim().length < 2) {
             return res.status(400).json({
                 success: false,
-                message: 'Full name is required and must be at least 3 characters.',
+                message: 'First name is required and must be at least 2 characters.',
+            });
+        }
+
+        // Validate last name
+        if (!lastName || lastName.trim().length < 2) {
+            return res.status(400).json({
+                success: false,
+                message: 'Last name is required and must be at least 2 characters.',
             });
         }
 
@@ -71,6 +82,14 @@ const createMember = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Flat number is required.',
+            });
+        }
+
+        // Validate birth date
+        if (!birthDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Birth date is required.',
             });
         }
 
@@ -124,15 +143,23 @@ const createMember = async (req, res) => {
             }
         }
 
+        // Compute fullName for file naming (pre-save hook will also set it on the document)
+        const fullName = [firstName.trim(), middleName?.trim(), lastName.trim()]
+            .filter(Boolean).join(' ');
+
         // Build member object
         const memberData = {
-            fullName: fullName.trim(),
+            firstName: firstName.trim(),
+            middleName: middleName ? middleName.trim() : '',
+            lastName: lastName.trim(),
+            // fullName is auto-derived by pre-save hook
             phoneNumber,
             flatNo: flatNo.trim(),
             wing: wing.toUpperCase(),
             type: type.toLowerCase(),
             email: email ? email.trim() : null,
             caste: caste ? caste.trim() : null,
+            birthDate: birthDate ? new Date(birthDate) : null,
             vehicles: {
                 bikes: {
                     count: vehicles?.bikes?.count || 0,

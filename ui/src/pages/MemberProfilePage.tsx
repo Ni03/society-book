@@ -11,6 +11,19 @@ import {
 } from '../components/member';
 import type { MemberFormData, MemberFormInitialValues } from '../components/member';
 
+/** Splits a full name string into first / middle / last parts */
+const splitFullName = (name: string) => {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return { firstName: '', middleName: '', lastName: '' };
+    if (parts.length === 1) return { firstName: parts[0], middleName: '', lastName: '' };
+    if (parts.length === 2) return { firstName: parts[0], middleName: '', lastName: parts[1] };
+    return {
+        firstName: parts[0],
+        middleName: parts.slice(1, -1).join(' '),
+        lastName: parts[parts.length - 1],
+    };
+};
+
 const MemberProfilePage: React.FC = () => {
     const { logout, fullName: authFullName } = useAuth();
     const navigate = useNavigate();
@@ -29,9 +42,16 @@ const MemberProfilePage: React.FC = () => {
                     const m = res.data.data;
                     setMember(m);
                     setInitialValues({
-                        fullName: m.fullName,
+                        // Use stored split names, or auto-derive from fullName for legacy records
+                        ...(m.firstName || m.lastName
+                            ? { firstName: m.firstName || '', middleName: m.middleName || '', lastName: m.lastName || '' }
+                            : splitFullName(m.fullName || '')
+                        ),
                         email: m.email ?? '',
                         caste: m.caste ?? '',
+                        birthDate: m.birthDate
+                            ? new Date(m.birthDate).toISOString().split('T')[0]
+                            : '',
                         phoneNumber: m.phoneNumber,
                         flatNo: m.flatNo || '',
                         vehicles: {
@@ -65,11 +85,8 @@ const MemberProfilePage: React.FC = () => {
             formData.append('phoneNumber', data.phoneNumber);
             formData.append('email', data.email.trim());
             formData.append('caste', data.caste);
+            formData.append('birthDate', data.birthDate || '');
             formData.append('flatNo', data.flatNo.trim());
-            if (member) {
-                formData.append('fullName', member.fullName);
-                formData.append('type', member.type);
-            }
             formData.append('vehicles', JSON.stringify({
                 bikes: {
                     count: data.vehicles.bikes.count,
@@ -158,9 +175,10 @@ const MemberProfilePage: React.FC = () => {
                                 fileMode: 'view-and-replace',
                                 fileLabel: attachmentLabel,
                                 fileRequired: true,
-                                // Caste / email are read-only in member portal
+                                // Caste / email / birth date are editable in member portal
                                 emailEditable: true,
                                 casteEditable: true,
+                                birthDateEditable: true,
                                 // Submit
                                 submitLabel: 'Save Changes',
                                 submitting: saving,

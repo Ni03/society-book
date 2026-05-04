@@ -40,9 +40,12 @@ const PublicFormPage: React.FC = () => {
         setLoading(true);
         try {
             const payload = new FormData();
-            payload.append('fullName', data.fullName.trim());
+            payload.append('firstName', data.firstName.trim());
+            payload.append('middleName', data.middleName.trim());
+            payload.append('lastName', data.lastName.trim());
             payload.append('email', data.email.trim());
             payload.append('caste', data.caste);
+            payload.append('birthDate', data.birthDate || '');
             payload.append('phoneNumber', data.phoneNumber);
             payload.append('flatNo', data.flatNo.trim());
             payload.append('wing', wingUpper);

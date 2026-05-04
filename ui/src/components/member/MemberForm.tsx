@@ -10,9 +10,12 @@ import { VehicleSection, emptyVehicles, FileViewLink, FormField } from './index'
 
 /** Values the parent page pre-fills the form with */
 export interface MemberFormInitialValues {
-    fullName?: string;
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
     email?: string;
     caste?: CasteType | '';
+    birthDate?: string;
     phoneNumber?: string;
     flatNo?: string;
     vehicles?: MemberVehicles;
@@ -23,9 +26,12 @@ export interface MemberFormInitialValues {
 
 /** Data emitted to the parent when the form is submitted */
 export interface MemberFormData {
-    fullName: string;
+    firstName: string;
+    middleName: string;
+    lastName: string;
     email: string;
     caste: CasteType | '';
+    birthDate: string;
     phoneNumber: string;
     flatNo: string;
     vehicles: MemberVehicles;
@@ -43,8 +49,9 @@ export interface MemberFormConfig {
     memberType: 'owner' | 'tenant';
 
     // ── Field visibility / editability ───────────────────────────────────────
-    /** Show and allow editing Full Name. Default: false */
+    /** Show the name section (First / Middle / Last Name). Default: false */
     showFullName?: boolean;
+    /** Allow editing name fields. Default: false */
     fullNameEditable?: boolean;
 
     /** Allow editing Phone Number. Default: true */
@@ -55,6 +62,8 @@ export interface MemberFormConfig {
     emailEditable?: boolean;
     /** Allow editing Caste. Default: true */
     casteEditable?: boolean;
+    /** Allow editing Birth Date. Default: true */
+    birthDateEditable?: boolean;
 
     /** Show a read-only Wing field. Default: false */
     showWing?: boolean;
@@ -121,6 +130,7 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
         flatNoEditable     = true,
         emailEditable      = true,
         casteEditable      = true,
+        birthDateEditable  = true,
         showWing           = false,
         wingDisplay        = '',
         showType           = false,
@@ -136,9 +146,12 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
     } = config;
 
     // ── Internal state — ADD NEW FIELDS HERE ─────────────────────────────────
-    const [fullName,           setFullName]           = useState(initialValues.fullName           ?? '');
+    const [firstName,          setFirstName]          = useState(initialValues.firstName          ?? '');
+    const [middleName,         setMiddleName]         = useState(initialValues.middleName         ?? '');
+    const [lastName,           setLastName]           = useState(initialValues.lastName           ?? '');
     const [email,              setEmail]              = useState(initialValues.email              ?? '');
     const [caste,              setCaste]              = useState<CasteType | ''>(initialValues.caste ?? '');
+    const [birthDate,          setBirthDate]          = useState(initialValues.birthDate          ?? '');
     const [phoneNumber,        setPhoneNumber]        = useState(initialValues.phoneNumber        ?? '');
     const [flatNo,             setFlatNo]             = useState(initialValues.flatNo             ?? '');
     const [vehicles,           setVehicles]           = useState<MemberVehicles>(initialValues.vehicles ?? emptyVehicles());
@@ -150,9 +163,12 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
 
     // Re-sync when initialValues change (after async fetch)
     useEffect(() => {
-        setFullName(           initialValues.fullName           ?? '');
+        setFirstName(          initialValues.firstName          ?? '');
+        setMiddleName(         initialValues.middleName         ?? '');
+        setLastName(           initialValues.lastName           ?? '');
         setEmail(              initialValues.email              ?? '');
         setCaste(              initialValues.caste              ?? '');
+        setBirthDate(          initialValues.birthDate          ?? '');
         setPhoneNumber(        initialValues.phoneNumber        ?? '');
         setFlatNo(             initialValues.flatNo             ?? '');
         setVehicles(           initialValues.vehicles           ?? emptyVehicles());
@@ -171,14 +187,21 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
             else toasts.push(msg);
         };
 
-        if (showFullName && fullNameEditable && (!fullName || fullName.trim().length < 3))
-            err('fullName', 'Full name must be at least 3 characters');
+        if (showFullName && fullNameEditable) {
+            if (!firstName || firstName.trim().length < 2)
+                err('firstName', 'First name must be at least 2 characters');
+            if (!lastName || lastName.trim().length < 2)
+                err('lastName', 'Last name must be at least 2 characters');
+        }
 
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
             err('email', 'A valid email address is required');
 
         if (!caste)
             err('caste', 'Caste is required');
+
+        if (!birthDate)
+            err('birthDate', 'Birth date is required');
 
         if (!phoneNumber || !/^\d{10}$/.test(phoneNumber))
             err('phoneNumber', 'Phone number must be exactly 10 digits');
@@ -229,25 +252,51 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!validate()) return;
-        await onSubmit({ fullName, email, caste, phoneNumber, flatNo, vehicles, lastDayOfAgreement, file });
+        await onSubmit({ firstName, middleName, lastName, email, caste, birthDate, phoneNumber, flatNo, vehicles, lastDayOfAgreement, file });
     };
 
     // ── Render — ADD NEW FIELD JSX HERE ──────────────────────────────────────
     return (
         <form onSubmit={handleSubmit} noValidate>
 
-            {/* Full Name */}
+            {/* Name Fields — First Name, Last Name (required), Middle Name (optional) */}
             {showFullName && (
-                <FormField
-                    id={`${idPrefix}-fullName`}
-                    label="Full Name"
-                    value={fullName}
-                    placeholder="Enter your full name"
-                    required={fullNameEditable}
-                    disabled={!fullNameEditable}
-                    error={errors.fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                />
+                <>
+                    <div style={{
+                        display: 'grid', gridTemplateColumns: '1fr 1fr',
+                        gap: '1rem', marginTop: '1rem',
+                    }}>
+                        <FormField
+                            id={`${idPrefix}-firstName`}
+                            label="First Name"
+                            value={firstName}
+                            placeholder="Enter first name"
+                            required={fullNameEditable}
+                            disabled={!fullNameEditable}
+                            error={errors.firstName}
+                            onChange={(e) => setFirstName(e.target.value)}
+                        />
+                        <FormField
+                            id={`${idPrefix}-lastName`}
+                            label="Last Name"
+                            value={lastName}
+                            placeholder="Enter last name"
+                            required={fullNameEditable}
+                            disabled={!fullNameEditable}
+                            error={errors.lastName}
+                            onChange={(e) => setLastName(e.target.value)}
+                        />
+                    </div>
+                    <FormField
+                        id={`${idPrefix}-middleName`}
+                        label="Middle Name"
+                        value={middleName}
+                        placeholder="Enter middle name (optional)"
+                        disabled={!fullNameEditable}
+                        onChange={(e) => setMiddleName(e.target.value)}
+                        style={{ marginTop: '1rem' }}
+                    />
+                </>
             )}
 
             {/* Email */}
@@ -282,6 +331,19 @@ const MemberForm: React.FC<Props> = ({ initialValues = {}, config, onSubmit }) =
                 </select>
                 {errors.caste && <div className="form-error">⚠ {errors.caste}</div>}
             </div>
+
+            {/* Birth Date */}
+            <FormField
+                id={`${idPrefix}-birthDate`}
+                label="Birth Date"
+                type="date"
+                value={birthDate}
+                required
+                disabled={!birthDateEditable}
+                error={errors.birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                style={{ marginTop: '1rem' }}
+            />
 
             {/* Phone Number */}
             <FormField

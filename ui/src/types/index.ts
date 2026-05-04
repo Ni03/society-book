@@ -30,10 +30,14 @@ export const CASTE_OPTIONS: CasteType[] = ['Open', 'SC', 'ST', 'OBC', 'VJ', 'NT'
 
 export interface Member {
     _id: string;
+    firstName: string;
+    middleName: string;
+    lastName: string;
     fullName: string;
     phoneNumber: string;
     email: string;
     caste: CasteType | '';
+    birthDate: string | null;
     flatNo: string;
     wing: string;
     type: 'owner' | 'tenant';

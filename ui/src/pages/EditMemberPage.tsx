@@ -10,6 +10,19 @@ import {
 } from '../components/member';
 import type { MemberFormData, MemberFormInitialValues } from '../components/member';
 
+/** Splits a full name string into first / middle / last parts */
+const splitFullName = (name: string) => {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return { firstName: '', middleName: '', lastName: '' };
+    if (parts.length === 1) return { firstName: parts[0], middleName: '', lastName: '' };
+    if (parts.length === 2) return { firstName: parts[0], middleName: '', lastName: parts[1] };
+    return {
+        firstName: parts[0],
+        middleName: parts.slice(1, -1).join(' '),
+        lastName: parts[parts.length - 1],
+    };
+};
+
 const EditMemberPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -28,9 +41,16 @@ const EditMemberPage: React.FC = () => {
                     const m = res.data.data;
                     setMember(m);
                     setInitialValues({
-                        fullName: m.fullName,
+                        // Use stored split names, or auto-derive from fullName for legacy records
+                        ...(m.firstName || m.lastName
+                            ? { firstName: m.firstName || '', middleName: m.middleName || '', lastName: m.lastName || '' }
+                            : splitFullName(m.fullName || '')
+                        ),
                         email: m.email ?? '',
                         caste: m.caste ?? '',
+                        birthDate: m.birthDate
+                            ? new Date(m.birthDate).toISOString().split('T')[0]
+                            : '',
                         phoneNumber: m.phoneNumber,
                         flatNo: m.flatNo || '',
                         vehicles: {
@@ -65,6 +85,7 @@ const EditMemberPage: React.FC = () => {
                 phoneNumber: data.phoneNumber,
                 email: data.email.trim(),
                 caste: data.caste,
+                birthDate: data.birthDate || null,
                 flatNo: data.flatNo.trim(),
                 vehicles: {
                     bikes: {
@@ -137,6 +158,7 @@ const EditMemberPage: React.FC = () => {
                             flatNoEditable: true,
                             emailEditable: true,
                             casteEditable: true,
+                            birthDateEditable: true,
                             // Wing display
                             showWing: true,
                             wingDisplay: `Wing ${member.wing}`,

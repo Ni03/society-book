@@ -25,10 +25,26 @@ const carEntrySchema = new mongoose.Schema(
 // ── Main member schema ────────────────────────────────────────────────────────
 const memberSchema = new mongoose.Schema(
     {
+        firstName: {
+            type: String,
+            required: [true, 'First name is required'],
+            minlength: [2, 'First name must be at least 2 characters'],
+            trim: true,
+        },
+        middleName: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        lastName: {
+            type: String,
+            required: [true, 'Last name is required'],
+            minlength: [2, 'Last name must be at least 2 characters'],
+            trim: true,
+        },
+        // Derived from firstName + middleName + lastName — do not set directly
         fullName: {
             type: String,
-            required: [true, 'Full name is required'],
-            minlength: [3, 'Full name must be at least 3 characters'],
             trim: true,
         },
         phoneNumber: {
@@ -52,6 +68,10 @@ const memberSchema = new mongoose.Schema(
             type: String,
             trim: true,
             default: null,
+        },
+        birthDate: {
+            type: Date,
+            required: [true, 'Birth date is required'],
         },
         flatNo: {
             type: String,
@@ -125,6 +145,13 @@ const normalizeReg = (r) => (r || '').trim().toUpperCase().replace(/\s+/g, '');
 
 // ── Pre-save: normalise all reg numbers ───────────────────────────────────────
 memberSchema.pre('save', function () {
+    // Derive fullName from name parts
+    if (this.firstName || this.lastName) {
+        this.fullName = [this.firstName, this.middleName, this.lastName]
+            .filter(Boolean)
+            .join(' ')
+            .trim();
+    }
     // Bikes — plain strings
     if (this.vehicles?.bikes?.registrationNumbers) {
         this.vehicles.bikes.registrationNumbers =
@@ -144,6 +171,11 @@ memberSchema.pre('save', function () {
 // ── Pre-findOneAndUpdate: normalise when vehicles are patched ──────────────────
 memberSchema.pre('findOneAndUpdate', function () {
     const update = this.getUpdate();
+    // Recompute fullName when name parts are included in the update
+    if (update?.firstName || update?.lastName) {
+        update.fullName = [update.firstName, update.middleName, update.lastName]
+            .filter(Boolean).join(' ').trim();
+    }
     if (update?.vehicles?.bikes?.registrationNumbers) {
         update.vehicles.bikes.registrationNumbers =
             update.vehicles.bikes.registrationNumbers.map(normalizeReg);
