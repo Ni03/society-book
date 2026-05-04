@@ -150,7 +150,7 @@ const MemberProfilePage: React.FC = () => {
                     ℹ️ You can update your <strong>vehicle details</strong> and your{' '}
                     <strong>{attachmentLabel}</strong>.
                     <br />
-                    &nbsp;&nbsp;&nbsp;&nbsp; Name, Phone No and Flat No fields are managed by your wing chairman.
+                    &nbsp;&nbsp;&nbsp;&nbsp; Phone No and Flat No fields are managed by your wing chairman.
                 </div>
 
                 <div className="card card--elevated">
@@ -168,7 +168,7 @@ const MemberProfilePage: React.FC = () => {
                                 idPrefix: 'member',
                                 // Personal fields — all read-only for member portal
                                 showFullName: true,
-                                fullNameEditable: false,
+                                fullNameEditable: true,
                                 phoneEditable: false,
                                 flatNoEditable: false,
                                 // Attachment
