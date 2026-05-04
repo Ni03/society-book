@@ -24,7 +24,22 @@ async function getSwRegistration(): Promise<ServiceWorkerRegistration | null> {
     if (!('serviceWorker' in navigator)) return null;
     if (_swRegistration) return _swRegistration;
     try {
-        _swRegistration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        _swRegistration = await navigator.serviceWorker.register('/sw.js', {
+            scope: '/',
+            // Never serve sw.js from the HTTP cache — always re-fetch so the
+            // browser detects new deployments immediately.
+            updateViaCache: 'none',
+        });
+
+        // When the new SW activates and sends SW_UPDATED, silently reload
+        // so users automatically get the latest assets without clearing cache.
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data?.type === 'SW_UPDATED') {
+                console.info('[SW] New version activated — reloading for fresh assets.');
+                window.location.reload();
+            }
+        });
+
         await navigator.serviceWorker.ready;
         return _swRegistration;
     } catch (err) {
@@ -32,6 +47,7 @@ async function getSwRegistration(): Promise<ServiceWorkerRegistration | null> {
         return null;
     }
 }
+
 
 /** role = 'member' → uses member push route; anything else → admin push route */
 export async function subscribePush(role?: string): Promise<void> {

@@ -10,8 +10,66 @@
  * Android Chrome: fully supported, including action buttons.
  */
 
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+// ── Cache identity ────────────────────────────────────────────────────────────
+const CACHE_NAME = 'resident-pwa-v1';
+
+// ── Install: pre-cache the app shell ─────────────────────────────────────────
+self.addEventListener('install', (e) => {
+    e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.add('/')));
+    self.skipWaiting();
+});
+
+// ── Activate: wipe old caches, claim open tabs, notify them to reload ─────────
+self.addEventListener('activate', (e) => {
+    e.waitUntil(
+        caches.keys()
+            .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+            .then(() => self.clients.claim())
+            .then(() =>
+                self.clients.matchAll({ type: 'window' }).then((clients) =>
+                    clients.forEach((c) => c.postMessage({ type: 'SW_UPDATED' }))
+                )
+            )
+    );
+});
+
+// ── Fetch: network-first for HTML, cache-first for hashed assets ──────────────
+self.addEventListener('fetch', (e) => {
+    const { request } = e;
+    const url = new URL(request.url);
+
+    // Only handle same-origin GETs; skip API calls
+    if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+    if (url.pathname.startsWith('/api/')) return;
+
+    // Navigation → always try network first so latest index.html is served
+    if (request.mode === 'navigate') {
+        e.respondWith(
+            fetch(request)
+                .then((res) => {
+                    caches.open(CACHE_NAME).then((cache) => cache.put(request, res.clone()));
+                    return res;
+                })
+                .catch(() => caches.match('/'))
+        );
+        return;
+    }
+
+    // Hashed assets (JS/CSS/fonts/images) → cache-first, fill on miss
+    if (/\.(js|css|woff2?|png|jpg|jpeg|svg|ico|webp)(\?.*)?$/.test(url.pathname)) {
+        e.respondWith(
+            caches.match(request).then((cached) => {
+                if (cached) return cached;
+                return fetch(request).then((res) => {
+                    caches.open(CACHE_NAME).then((cache) => cache.put(request, res.clone()));
+                    return res;
+                });
+            })
+        );
+    }
+});
+
+
 
 /* ── Push received ──────────────────────────────────────────────────────── */
 self.addEventListener('push', (event) => {
